@@ -1,0 +1,32 @@
+{% extends "index.html" %}
+
+{% block title %}Verify Login{% endblock %}
+
+{% block content %}
+<div class="container d-flex justify-content-center align-items-center vh-100">
+    <div class="col-md-4 bg-light p-4 rounded shadow">
+        <h2 class="text-center">Two-Factor Authentication</h2>
+        <p class="text-center">Enter the six-digit code sent to your email.</p>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <form action="{{ url_for('verify') }}" method="POST">
+            <div class="mb-3">
+                <label for="otp" class="form-label">Verification Code:</label>
+                <input type="text" class="form-control" name="otp" required maxlength="6" minlength="6" placeholder="Enter 6-digit code">
+            </div>
+            <button type="submit" class="btn btn-primary w-100">Verify</button>
+        </form>
+
+        <p class="text-center mt-3">
+            Didn't receive a code? <a href="{{ url_for('resend_otp') }}">Resend</a>
+        </p>
+    </div>
+</div>
+{% endblock %}

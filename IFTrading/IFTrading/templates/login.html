@@ -3,8 +3,28 @@
 {% block title %}Login{% endblock %}
 
 {% block content %}
-<div class="container">
-    <h2>Login</h2>
-    <p>Access your account.</p>
+<div class="container d-flex justify-content-center align-items-center vh-100">
+    <div class="col-md-4 bg-light p-4 rounded shadow">
+        <h2 class="text-center"><b>IFT-Trading Login</b></h2>
+        <form action="{{ url_for('login') }}" method="POST">
+            <div class="mb-3">
+                <label for="username_email" class="form-label">Email:</label>
+                <input type="text" class="form-control" name="username_email" required>
+            </div>
+
+            <div class="mb-3">
+                <label for="password" class="form-label">Password:</label>
+                <input type="password" class="form-control" name="password" required>
+            </div>
+
+            <div class="mb-3 form-check">
+                <input type="checkbox" class="form-check-input" name="remember">
+                <label class="form-check-label">Remember Me</label>
+            </div>
+
+            <button type="submit" class="btn btn-primary w-100">Login</button>
+        </form>
+        <p class="text-center mt-3"><a href="#">I Forgot My Password</a></p>
+    </div>
 </div>
 {% endblock %}

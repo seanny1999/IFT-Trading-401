@@ -3,8 +3,64 @@
 {% block title %}Sign Up{% endblock %}
 
 {% block content %}
-<div class="container">
-    <h2>Create an Account</h2>
-    <p>Sign up to start trading stocks.</p>
+<div class="container d-flex justify-content-center align-items-center my-5">
+    <div class="col-md-6 bg-light p-4 rounded shadow">
+        <h2 class="text-center">Sign up</h2>
+        <form action="{{ url_for('signup') }}" method="POST">
+
+            <div class="mb-3">
+                <label for="full_name" class="form-label">Full Name:</label>
+                <input type="text" class="form-control" name="full_name" required>
+            </div>
+
+            <div class="mb-3">
+                <label for="username" class="form-label">Username:</label>
+                <input type="text" class="form-control" name="username" required>
+            </div>
+
+            <div class="mb-3">
+                <label for="email" class="form-label">Email:</label>
+                <input type="email" class="form-control" name="email" required>
+            </div>
+
+            <div class="mb-3">
+                <label for="phone" class="form-label">Phone Number:</label>
+                <input type="text" class="form-control" name="phone" required>
+            </div>
+
+            <div class="mb-3">
+                <label for="ssn" class="form-label">SSN:</label>
+                <input type="text" class="form-control" name="ssn" required>
+            </div>
+
+            <div class="mb-3">
+                <label for="dob" class="form-label">Date of Birth:</label>
+                <input type="date" class="form-control" name="dob" required>
+            </div>
+
+            <div class="mb-3">
+                <label for="citizenship" class="form-label">Citizenship:</label>
+                <input type="text" class="form-control" name="citizenship" required>
+            </div>
+
+            <div class="mb-3">
+                <label for="password" class="form-label">Password:</label>
+                <input type="password" class="form-control" name="password" required>
+            </div>
+
+            <div class="mb-3">
+                <label for="confirm_password" class="form-label">Confirm Password:</label>
+                <input type="password" class="form-control" name="confirm_password" required>
+            </div>
+
+            <p class="small text-muted">
+                - 14+ chars, 2 uppercase, 2 lowercase, 2 numbers<br>
+                - 2 special characters, no common passwords
+            </p>
+
+            <button type="submit" class="btn btn-primary w-100">Sign Up</button>
+        </form>
+        <p class="text-center mt-3">Already have an account? <a href="{{ url_for('login') }}">Log in</a></p>
+    </div>
 </div>
 {% endblock %}

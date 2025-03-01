@@ -1,1 +1,24 @@
+/* LOGIN FORM - Should be vertical */
+.login-form {
+    display: flex;
+    flex-direction: column;
+    width: 250px;
+    margin: auto;
+}
 
+.login-form label,
+.login-form input,
+.login-form button {
+    margin-bottom: 10px;
+}
+
+/* SIGNUP FORM - Should be horizontal */
+.signup-form {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.signup-form label {
+    margin-right: 5px;
+}
