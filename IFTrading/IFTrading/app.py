@@ -11,7 +11,7 @@ from datetime import datetime
 app = Flask(__name__)
 
 # Configuration for database and security
-app.config["SQLALCHEMY_DATABASE_URI"] = "mysql+pymysql://root:password@localhost/IFT_Trading"
+app.config["SQLALCHEMY_DATABASE_URI"] = "mysql+pymysql://root:Lcja2017!@localhost/IFT_Trading"
 app.config["SECRET_KEY"] = "YOUR_SECRET_KEY_HERE"
 
 # Yahoo SMTP Configuration
@@ -223,6 +223,24 @@ def profile():
 @login_required
 def portfolio():
     return render_template('portfolio.html')
+
+@app.route('/buy', methods=["GET","POST"])
+def buy():
+    if request.method == "POST":
+        return redirect(url_for('buying_stock'))
+
+@app.route('/buying_stock')
+def buying_stock():
+    return render_template('buy.html')
+
+@app.route('/sell', methods=["GET","POST"])
+def sell():
+    if request.method == "POST":
+        return redirect(url_for('selling_stock'))
+
+@app.route('/selling_stock')
+def selling_stock():
+    return render_template('sell.html')
 
 @app.route('/stocks')
 def stocks():
