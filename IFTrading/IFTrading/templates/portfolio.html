@@ -29,25 +29,6 @@
         {% endwith %}
     </div>
 
-    <!-- Buy / Sell / Deposit -->
-    <div class="d-flex justify-content-center gap-3 mt-4">
-        <form action= "{{ url_for('buy') }}" method = "POST">
-        <button type= "submit" name = "buy" class= "btn btn-primary d-flex align-items-center gap-2">
-            <span class="fs-4">+</span> Buy
-        </button>
-        </form>
-
-        <form action= "{{ url_for('sell') }}" method = "POST">
-        <button type= "submit" name = "sell" class= "btn btn-danger d-flex align-items-center gap-2">
-            <span class="fs-4">-</span> Sell
-        </button>
-        </form>
-        
-        <button class="btn btn-success d-flex align-items-center gap-2">
-            <span class="fs-4">$</span> Deposit
-        </button>
-    </div>
-
     <!-- Stock Holdings Table -->
     <div class="mt-5">
         <h4 class="text-center">Stock Holdings</h4>
@@ -64,18 +45,18 @@
             <tbody>
                 <!-- Various Stocks -->
                 <tr>
-                    <td>AAPL</td>
-                    <td>Apple Inc.</td>
-                    <td>5</td>
-                    <td>$180.00</td>
-                    <td>$900.00</td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
                 </tr>
                 <tr>
-                    <td>TSLA</td>
-                    <td>Tesla Inc.</td>
-                    <td>3</td>
-                    <td>$250.00</td>
-                    <td>$750.00</td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
                 </tr>
             </tbody>
         </table>

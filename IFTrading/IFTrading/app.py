@@ -60,6 +60,58 @@ class Users(UserMixin, db.Model):
     citizenship = db.Column(db.String(100), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    balance = db.Column(db.Float, nullable=False, default=10000.0)
+
+# Portfolio Model
+class Portfolio(db.Model):
+    portfolio_id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    stock_id = db.Column(db.Integer, db.ForeignKey('stocks.stock_id'), nullable=False)
+    quantity_owned = db.Column(db.Integer, nullable=False)
+    last_updated = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+# Stocks Model
+class Stocks(db.Model):
+    stock_id = db.Column(db.Integer, primary_key=True)
+    role_id = db.Column(db.Integer, db.ForeignKey('user_roles.id'), nullable=False)
+    ticker = db.Column(db.String(10), unique=True, nullable=False)
+    company_name = db.Column(db.String(100), unique=True, nullable=False)
+    initial_price = db.Column(db.Float, nullable=False)
+    current_price = db.Column(db.Float, nullable=False)
+    daily_low = db.Column(db.Float, nullable=False)
+    daily_high = db.Column(db.Float, nullable=False)
+    market_cap = db.Column(db.String(50), nullable=False)
+    volume = db.Column(db.Integer, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def __repr__(self):
+        return f"<Stock {self.company_name}, Ticker: {self.ticker}, Current Price: {self.current_price}>"
+    
+# Orders Model
+class Orders(db.Model):
+    order_id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    stock_id = db.Column(db.Integer, db.ForeignKey('stocks.stock_id'), nullable=False)
+    order_type = db.Column(db.String(10), nullable=False) 
+    quantity = db.Column(db.Integer, nullable=False)
+    price_at_order = db.Column(db.Float, nullable=False)
+    order_status = db.Column(db.String(20), nullable=False, default="Pending")
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    cancel_timestamp = db.Column(db.DateTime, nullable=True)
+
+# Transactions Model
+class Transactions(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    order_id = db.Column(db.Integer, db.ForeignKey('orders.order_id'), nullable=False)
+    stock_id = db.Column(db.Integer, db.ForeignKey('stocks.stock_id'), nullable=False)
+    company_name = db.Column(db.String(100), nullable=False)
+    ticker = db.Column(db.String(10), db.ForeignKey('stocks.ticker'), nullable=False)
+    transaction_type = db.Column(db.String(10), nullable=False)  # Buy or Sell
+    quantity = db.Column(db.Integer, nullable=False)
+    total_amount = db.Column(db.Float, nullable=False)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    cancel_timestamp = db.Column(db.DateTime, nullable=True)
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -241,25 +293,122 @@ def profile():
 @app.route('/portfolio')
 @login_required
 def portfolio():
-    return render_template('portfolio.html')
+    transactions = Transactions.query.filter_by(user_id=current_user.id).all()
+    return render_template('portfolio.html', transactions=transactions, balance=current_user.balance)
 
-@app.route('/buy', methods=["GET","POST"])
+@app.route('/trade_stock', methods=["GET", "POST"])
+def trade_stock():
+    action = request.form.get("action")
+    ticker = request.form.get("ticker")
+    shares = request.form.get("shares")
+    order_type = request.form.get("orderType")
+
+    print(f"{action.capitalize()} {shares} shares of {ticker} as a {order_type} order.")
+    return "Trade executed successfully"
+
+@app.route('/buy', methods=["GET", "POST"])
+@login_required
 def buy():
     if request.method == "POST":
-        return redirect(url_for('buying_stock'))
+        ticker = request.form.get("ticker")
+        shares = int(request.form.get("shares"))
+        stock_prices = {
+            "AAPL": 235.93,
+            "TSLA": 272.04,
+            "INTC": 21.33,
+            "MSFT": 388.61,
+            "BA": 158.90
+        }
 
-@app.route('/buying_stock')
-def buying_stock():
-    return render_template('buy.html')
+        stock_names = {
+            "AAPL": "Apple Inc.",
+            "TSLA": "Tesla Inc.",
+            "INTC": "Intel Corp",
+            "MSFT": "Microsoft Corp",
+            "BA": "Boeing Co"
+        }
 
-@app.route('/sell', methods=["GET","POST"])
+        if ticker not in stock_prices:
+            flash("Invalid stock ticker!", "danger")
+            return redirect(url_for("portfolio"))
+        
+        price = stock_prices[ticker]
+        company = stock_names[ticker]
+        total_cost = shares * price
+
+        if current_user.balance < total_cost:
+            flash("Insufficient funds!", "danger")
+            return redirect(url_for("portfolio"))
+
+        # Deduct balance
+        current_user.balance -= total_cost
+
+        # Create an order entry
+        new_order = Orders(
+            user_id=current_user.id,
+            stock_id=1,  
+            order_type="Buy",
+            quantity=shares,
+            price_at_order=price,
+            order_status="Completed"
+        )
+        db.session.add(new_order)
+        db.session.commit()
+
+        # Create a transaction entry
+        new_transaction = Transactions(
+            user_id=current_user.id,
+            order_id=1,
+            stock_id=1,  
+            company_name=company,
+            ticker=ticker,
+            transaction_type="Buy",
+            quantity=shares,
+            total_amount=total_cost
+        )
+        db.session.add(new_transaction)
+
+        # Update user's portfolio
+        portfolio_entry = Portfolio.query.filter_by(user_id=current_user.id, stock_id=1).first()
+        if portfolio_entry:
+            portfolio_entry.quantity_owned += shares
+            portfolio_entry.last_updated = datetime.utcnow()
+        else:
+            new_portfolio_entry = Portfolio(
+                user_id=current_user.id,
+                stock_id=1,  
+                quantity_owned=shares
+            )
+            db.session.add(new_portfolio_entry)
+
+        db.session.commit()
+        flash("Stock purchased successfully!", "success")
+        return redirect(url_for("portfolio"))
+    return render_template("buy.html")
+
+@app.route('/sell', methods=["GET", "POST"])
+@login_required
 def sell():
     if request.method == "POST":
-        return redirect(url_for('selling_stock'))
-
-@app.route('/selling_stock')
-def selling_stock():
-    return render_template('sell.html')
+        ticker = request.form.get("ticker")
+        shares_to_sell = int(request.form.get("shares"))
+        price = 100
+        total_gain = shares_to_sell * price
+        
+        user_shares = db.session.query(db.func.sum(Transactions.quantity)).filter_by(ticker=ticker, transaction_type='Buy').scalar() or 0
+        sold_shares = db.session.query(db.func.sum(Transactions.quantity)).filter_by(ticker=ticker, transaction_type='Sell').scalar() or 0
+        net_shares = user_shares - sold_shares
+        
+        if shares_to_sell > net_shares:
+            flash("Not enough shares to sell!", "danger")
+            return redirect(url_for("portfolio"))
+        
+        current_user.balance += total_gain
+        db.session.add(Transactions(user_id=current_user.id, order_id=1, stock_id=1, company_name="Company", ticker=ticker, transaction_type='Sell', quantity=shares_to_sell, total_amount=total_gain))
+        db.session.commit()
+        flash("Stock sold successfully!", "success")
+        return redirect(url_for("portfolio"))
+    return render_template("sell.html")
 
 @app.route('/stocks')
 def stocks():
@@ -293,4 +442,6 @@ def add_stock():
     return render_template("add_stock.html")
 
 if __name__ == '__main__':
+    with app.app_context():
+        db.create_all()
     app.run(debug=True)
