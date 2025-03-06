@@ -14,7 +14,7 @@
     <!-- Total Balance -->
     <div class="text-center mt-3">
         <h4>Total Balance</h4>
-        <h2 class="text-success">$10,000.00 USD</h2>
+        <h2 class="text-success">${{ balance }} USD</h2>
     </div>
 
     <div class="container">
@@ -43,27 +43,17 @@
                 </tr>
             </thead>
             <tbody>
-                <!-- Various Stocks -->
+                {% for holding in holdings %}
                 <tr>
-                    <td></td>
-                    <td></td>
-                    <td></td>
-                    <td></td>
-                    <td></td>
+                    <td>{{ holding.ticker }}</td>
+                    <td>{{ holding.company }}</td>
+                    <td>{{ holding.quantity }}</td>
+                    <td>${{ '%.2f'|format(holding.price) }}</td>
+                    <td>${{ '%.2f'|format(holding.value) }}</td>
                 </tr>
-                <tr>
-                    <td></td>
-                    <td></td>
-                    <td></td>
-                    <td></td>
-                    <td></td>
-                </tr>
+                {% endfor %}
             </tbody>
         </table>
     </div>
 </div>
-
-
-
 {% endblock %}
-

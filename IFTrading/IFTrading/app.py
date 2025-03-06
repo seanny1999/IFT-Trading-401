@@ -7,7 +7,7 @@ from functools import wraps
 from flask_bcrypt import Bcrypt
 from flask_mail import Mail, Message
 from datetime import datetime
-
+from flask_migrate import Migrate
 
 app = Flask(__name__)
 
@@ -32,7 +32,7 @@ bcrypt = Bcrypt(app)
 mail = Mail(app)
 login_manager = LoginManager(app)
 login_manager.login_view = "login"
-
+migrate = Migrate(app, db)
 # Hashing Functions
 def hash_data(data):
     return bcrypt.generate_password_hash(data).decode('utf-8')
@@ -106,7 +106,7 @@ class Transactions(db.Model):
     order_id = db.Column(db.Integer, db.ForeignKey('orders.order_id'), nullable=False)
     stock_id = db.Column(db.Integer, db.ForeignKey('stocks.stock_id'), nullable=False)
     company_name = db.Column(db.String(100), nullable=False)
-    ticker = db.Column(db.String(10), db.ForeignKey('stocks.ticker'), nullable=False)
+    ticker = db.Column(db.String(10),nullable=False)
     transaction_type = db.Column(db.String(10), nullable=False)  # Buy or Sell
     quantity = db.Column(db.Integer, nullable=False)
     total_amount = db.Column(db.Float, nullable=False)
@@ -293,57 +293,69 @@ def profile():
 @app.route('/portfolio')
 @login_required
 def portfolio():
-    transactions = Transactions.query.filter_by(user_id=current_user.id).all()
-    return render_template('portfolio.html', transactions=transactions, balance=current_user.balance)
+    portfolio_entries = Portfolio.query.filter_by(user_id=current_user.id).all()
+    holdings = []
+    for entry in portfolio_entries:
+        stock = Stocks.query.get(entry.stock_id)
+        if stock:
+            holdings.append({
+                'ticker': stock.ticker,
+                'company': stock.company_name,
+                'quantity': entry.quantity_owned,
+                'price': stock.current_price,
+                'value': entry.quantity_owned * stock.current_price
+            })
+    
+    return render_template('portfolio.html', holdings=holdings, balance=current_user.balance)
 
 @app.route('/trade_stock', methods=["GET", "POST"])
 def trade_stock():
     action = request.form.get("action")
     ticker = request.form.get("ticker")
-    shares = request.form.get("shares")
+    try:
+        shares = int(request.form.get("shares"))
+    except (ValueError, TypeError):
+        flash("Invalid number of shares.", "danger")  
+        return redirect(url_for("portfolio"))
     order_type = request.form.get("orderType")
 
-    print(f"{action.capitalize()} {shares} shares of {ticker} as a {order_type} order.")
-    return "Trade executed successfully"
+    stock_prices = {
+        "AAPL": 235.93,
+        "TSLA": 272.04,
+        "INTC": 21.33,
+        "MSFT": 388.61,
+        "BA": 158.90
+    }
+    stock_names = {
+        "AAPL": "Apple Inc.",
+        "TSLA": "Tesla Inc.",
+        "INTC": "Intel Corp",
+        "MSFT": "Microsoft Corp",
+        "BA": "Boeing Co"
+    }
 
-@app.route('/buy', methods=["GET", "POST"])
-@login_required
-def buy():
-    if request.method == "POST":
-        ticker = request.form.get("ticker")
-        shares = int(request.form.get("shares"))
-        stock_prices = {
-            "AAPL": 235.93,
-            "TSLA": 272.04,
-            "INTC": 21.33,
-            "MSFT": 388.61,
-            "BA": 158.90
-        }
+    if ticker not in stock_prices:
+        flash("Invalid stock ticker!", "danger")
+        return redirect(url_for("portfolio"))
 
-        stock_names = {
-            "AAPL": "Apple Inc.",
-            "TSLA": "Tesla Inc.",
-            "INTC": "Intel Corp",
-            "MSFT": "Microsoft Corp",
-            "BA": "Boeing Co"
-        }
+    price = stock_prices[ticker]
+    company = stock_names[ticker]
 
-        if ticker not in stock_prices:
-            flash("Invalid stock ticker!", "danger")
-            return redirect(url_for("portfolio"))
-        
-        price = stock_prices[ticker]
-        company = stock_names[ticker]
+    if action == "buy":
         total_cost = shares * price
+        user_balance = current_user.balance if current_user.balance is not None else 0.0
 
-        if current_user.balance < total_cost:
+        flash(f"Balance before purchase: ${user_balance:.2f}", "info")
+
+        if user_balance < total_cost:
             flash("Insufficient funds!", "danger")
             return redirect(url_for("portfolio"))
+        # Deduct funds and update balance
+        current_user.balance = user_balance - total_cost
 
-        # Deduct balance
-        current_user.balance -= total_cost
+        flash(f"Updated balance after purchase: ${current_user.balance:.2f}", "info")
 
-        # Create an order entry
+        # Create a Buy order
         new_order = Orders(
             user_id=current_user.id,
             stock_id=1,  
@@ -355,10 +367,10 @@ def buy():
         db.session.add(new_order)
         db.session.commit()
 
-        # Create a transaction entry
+        # Record the transaction
         new_transaction = Transactions(
             user_id=current_user.id,
-            order_id=1,
+            order_id=new_order.order_id,
             stock_id=1,  
             company_name=company,
             ticker=ticker,
@@ -368,7 +380,7 @@ def buy():
         )
         db.session.add(new_transaction)
 
-        # Update user's portfolio
+        # Update portfolio entry
         portfolio_entry = Portfolio.query.filter_by(user_id=current_user.id, stock_id=1).first()
         if portfolio_entry:
             portfolio_entry.quantity_owned += shares
@@ -384,32 +396,51 @@ def buy():
         db.session.commit()
         flash("Stock purchased successfully!", "success")
         return redirect(url_for("portfolio"))
-    return render_template("buy.html")
-
-@app.route('/sell', methods=["GET", "POST"])
-@login_required
-def sell():
-    if request.method == "POST":
-        ticker = request.form.get("ticker")
-        shares_to_sell = int(request.form.get("shares"))
-        price = 100
-        total_gain = shares_to_sell * price
-        
-        user_shares = db.session.query(db.func.sum(Transactions.quantity)).filter_by(ticker=ticker, transaction_type='Buy').scalar() or 0
-        sold_shares = db.session.query(db.func.sum(Transactions.quantity)).filter_by(ticker=ticker, transaction_type='Sell').scalar() or 0
+    elif action == "sell":
+        user_shares = db.session.query(db.func.sum(Transactions.quantity)).filter_by(ticker=ticker, transaction_type='Buy', user_id=current_user.id).scalar() or 0
+        sold_shares = db.session.query(db.func.sum(Transactions.quantity)).filter_by(ticker=ticker, transaction_type='Sell', user_id=current_user.id).scalar() or 0
         net_shares = user_shares - sold_shares
-        
-        if shares_to_sell > net_shares:
+
+        if shares > net_shares:
             flash("Not enough shares to sell!", "danger")
             return redirect(url_for("portfolio"))
+
+        total_gain = shares * price
+        user_balance = current_user.balance if current_user.balance is not None else 0.0
+        current_user.balance = user_balance + total_gain
         
-        current_user.balance += total_gain
-        db.session.add(Transactions(user_id=current_user.id, order_id=1, stock_id=1, company_name="Company", ticker=ticker, transaction_type='Sell', quantity=shares_to_sell, total_amount=total_gain))
+        # Create a Sell order
+        new_order = Orders(
+            user_id=current_user.id,
+            stock_id=1,  
+            order_type="Sell",
+            quantity=shares,
+            price_at_order=price,
+            order_status="Completed"
+        )
+        db.session.add(new_order)
         db.session.commit()
+
+        # Record the transaction
+        new_transaction = Transactions(
+            user_id=current_user.id,
+            order_id=new_order.order_id,
+            stock_id=1,  
+            company_name=company,
+            ticker=ticker,
+            transaction_type="Sell",
+            quantity=shares,
+            total_amount=total_gain
+        )
+        db.session.add(new_transaction)
+        db.session.commit()
+
         flash("Stock sold successfully!", "success")
         return redirect(url_for("portfolio"))
-    return render_template("sell.html")
-
+    else:
+        flash("Invalid trade action.", "danger")
+        return redirect(url_for("portfolio"))
+    
 @app.route('/stocks')
 def stocks():
     return render_template('stocks.html')
