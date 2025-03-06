@@ -7,9 +7,7 @@ from functools import wraps
 from flask_bcrypt import Bcrypt
 from flask_mail import Mail, Message
 from datetime import datetime
-from flask_wtf import FlaskForm
-from wtforms import StringField, FloatField, IntegerField, SubmitField 
-from wtforms.validators import DataRequired
+
 
 app = Flask(__name__)
 
@@ -77,15 +75,13 @@ class Stock(db.Model):
     marketcap = db.Column(db.String(100), nullable=True)
     volume = db.Column(db.String(100), nullable=True)
 
-# Form class for creating stocks
-class StockForm(FlaskForm): 
-    ticker = StringField('Ticker Symbol', validators=[DataRequired()]) 
-    company = StringField('Company', validators=[DataRequired()]) 
-    price = FloatField('Price', validators=[DataRequired()])
-    shares = StringField('Shares', validators=[DataRequired()]) 
-    marketcap = StringField('Market Cap')
-    volume = StringField('Volume')
-    submit = SubmitField('Create')
+    def __init__(self, ticker, company, price, shares, marketcap, volume):
+        self.ticker = ticker
+        self.company = company
+        self.price = price
+        self.shares = shares
+        self.marketcap = marketcap
+        self.volume = volume
 
 # Admin access decorator
 def admin_required(f):
@@ -281,13 +277,20 @@ def history():
 @login_required
 @admin_required
 def add_stock(): 
-    form = StockForm()
-    if form.validate_on_submit():  
-        db.session.add(Stock(ticker=form.ticker.data, company=form.company.data, price=form.price.data, shares=form.shares.data, marketcap=form.marketcap.data, volume=form.volume.data))
+    if request.method == 'POST':
+        ticker = request.form['ticker']
+        company = request.form['company']
+        price = request.form['price']
+        shares = request.form['shares']
+        marketcap = request.form['marketcap']
+        volume = request.form['volume']
+
+        new_stock = Stock(ticker, company, price, shares, marketcap, volume)
+        db.session.add(new_stock)
         db.session.commit() 
         flash('Stock added successfully!')
         return redirect(url_for('admin'))
-    return render_template("add_stock.html", form=form)
+    return render_template("add_stock.html")
 
 if __name__ == '__main__':
     app.run(debug=True)
