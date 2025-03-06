@@ -7,11 +7,14 @@ from functools import wraps
 from flask_bcrypt import Bcrypt
 from flask_mail import Mail, Message
 from datetime import datetime
+from flask_wtf import FlaskForm
+from wtforms import StringField, FloatField, IntegerField, SubmitField 
+from wtforms.validators import DataRequired
 
 app = Flask(__name__)
 
 # Configuration for database and security
-app.config["SQLALCHEMY_DATABASE_URI"] = "mysql+pymysql://root:Lcja2017!@localhost/IFT_Trading"
+app.config["SQLALCHEMY_DATABASE_URI"] = "mysql+pymysql://root:password@localhost/IFT_Trading"
 app.config["SECRET_KEY"] = "YOUR_SECRET_KEY_HERE"
 
 # Yahoo SMTP Configuration
@@ -63,6 +66,26 @@ class Users(UserMixin, db.Model):
 @login_manager.user_loader
 def load_user(user_id):
     return Users.query.get(int(user_id))
+
+# Stocks Model
+class Stock(db.Model): 
+    id = db.Column(db.Integer, primary_key=True) 
+    ticker = db.Column(db.String(100), nullable=False) 
+    company = db.Column(db.String(100), nullable=False) 
+    price = db.Column(db.Float, nullable=False)
+    shares = db.Column(db.String(100), nullable=False) 
+    marketcap = db.Column(db.String(100), nullable=True)
+    volume = db.Column(db.String(100), nullable=True)
+
+# Form class for creating stocks
+class StockForm(FlaskForm): 
+    ticker = StringField('Ticker Symbol', validators=[DataRequired()]) 
+    company = StringField('Company', validators=[DataRequired()]) 
+    price = FloatField('Price', validators=[DataRequired()])
+    shares = StringField('Shares', validators=[DataRequired()]) 
+    marketcap = StringField('Market Cap')
+    volume = StringField('Volume')
+    submit = SubmitField('Create')
 
 # Admin access decorator
 def admin_required(f):
@@ -253,6 +276,18 @@ def about():
 @app.route('/history')
 def history():
     return render_template('history.html')
+
+@app.route("/admin/add_stock", methods=["GET", "POST"])
+@login_required
+@admin_required
+def add_stock(): 
+    form = StockForm()
+    if form.validate_on_submit():  
+        db.session.add(Stock(ticker=form.ticker.data, company=form.company.data, price=form.price.data, shares=form.shares.data, marketcap=form.marketcap.data, volume=form.volume.data))
+        db.session.commit() 
+        flash('Stock added successfully!')
+        return redirect(url_for('admin'))
+    return render_template("add_stock.html", form=form)
 
 if __name__ == '__main__':
     app.run(debug=True)

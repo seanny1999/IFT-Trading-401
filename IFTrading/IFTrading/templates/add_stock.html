@@ -1,0 +1,37 @@
+{% extends "index_admin.html" %}
+
+{% block title %}Manage Stocks{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h2>Create A Stock</h2>
+    <form action="{{ url_for('add_stock') }}" method="POST">
+        <div class="mb-3">
+            <label for="ticker" class="form-label">Ticker Symbol</label>
+            <input type="text" class="form-control" id="ticker" name="ticker" required>
+        </div>
+        <div class="mb-3">
+            <label for="company" class="form-label">Company</label>
+            <input type="text" class="form-control" id="company" name="company" required>
+        </div>
+        <div class="mb-3">
+            <label for="price" class="form-label">Price</label>
+            <input type="number" step="0.01" class="form-control" id="price" name="price" required>
+        </div>
+        <div class="mb-3">
+            <label for="shares" class="form-label">Shares</label>
+            <input type="number" class="form-control" id="shares" name="shares" required>
+        </div>
+        <div class="mb-3">
+            <label for="marketcap" class="form-label">Market Cap</label>
+            <input type="text" class="form-control" id="marketcap" name="marketcap" required>
+        </div>
+        <div class="mb-3">
+            <label for="volume" class="form-label">Volume</label>
+            <input type="text" class="form-control" id="volume" name="volume" required>
+        </div>
+        <button type="submit" class="btn btn-primary">Create</button>
+        <a href="{{ url_for('admin') }}" class="btn btn-secondary">Cancel</a>
+    </form>
+</div>
+{% endblock %}
