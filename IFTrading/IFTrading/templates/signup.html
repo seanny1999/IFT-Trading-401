@@ -5,9 +5,20 @@
 {% block content %}
 <div class="container d-flex justify-content-center align-items-center my-5">
     <div class="col-md-6 bg-light p-4 rounded shadow">
-        <h2 class="text-center">Sign up</h2>
-        <form action="{{ url_for('signup') }}" method="POST">
+        <h2 class="text-center">Sign Up</h2>
 
+        <!-- Display Errors at the Top -->
+        {% if errors %}
+            <div class="alert alert-danger">
+                <ul>
+                    {% for error in errors %}
+                        <li>{{ error }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        {% endif %}
+
+        <form action="{{ url_for('signup') }}" method="POST">
             <div class="mb-3">
                 <label for="full_name" class="form-label">Full Name:</label>
                 <input type="text" class="form-control" name="full_name" required>
@@ -25,17 +36,20 @@
 
             <div class="mb-3">
                 <label for="phone" class="form-label">Phone Number:</label>
-                <input type="text" class="form-control" name="phone" required>
+                <input type="text" class="form-control" name="phone" required maxlength="10" pattern="\d{10}">
+                <small class="text-muted">Must be exactly 10 digits.</small>
             </div>
 
             <div class="mb-3">
                 <label for="ssn" class="form-label">SSN:</label>
-                <input type="text" class="form-control" name="ssn" required>
+                <input type="text" class="form-control" name="ssn" required maxlength="9" pattern="\d{9}">
+                <small class="text-muted">Must be exactly 9 digits.</small>
             </div>
 
             <div class="mb-3">
                 <label for="dob" class="form-label">Date of Birth:</label>
                 <input type="date" class="form-control" name="dob" required>
+                <small class="text-muted">You must be at least 18 years old.</small>
             </div>
 
             <div class="mb-3">
@@ -46,6 +60,7 @@
             <div class="mb-3">
                 <label for="password" class="form-label">Password:</label>
                 <input type="password" class="form-control" name="password" required>
+                <small class="text-muted">14+ chars, 2 uppercase, 2 lowercase, 2 numbers, 2 special chars.</small>
             </div>
 
             <div class="mb-3">
@@ -53,13 +68,9 @@
                 <input type="password" class="form-control" name="confirm_password" required>
             </div>
 
-            <p class="small text-muted">
-                - 14+ chars, 2 uppercase, 2 lowercase, 2 numbers<br>
-                - 2 special characters, no common passwords
-            </p>
-
             <button type="submit" class="btn btn-primary w-100">Sign Up</button>
         </form>
+
         <p class="text-center mt-3">Already have an account? <a href="{{ url_for('login') }}">Log in</a></p>
     </div>
 </div>

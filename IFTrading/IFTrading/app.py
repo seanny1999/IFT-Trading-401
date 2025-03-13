@@ -8,6 +8,8 @@ from flask_bcrypt import Bcrypt
 from flask_mail import Mail, Message
 from datetime import datetime
 from flask_migrate import Migrate
+from itsdangerous import URLSafeTimedSerializer
+import re
 
 app = Flask(__name__)
 
@@ -15,16 +17,19 @@ app = Flask(__name__)
 app.config["SQLALCHEMY_DATABASE_URI"] = "mysql+pymysql://root:password@localhost/IFT_Trading"
 app.config["SECRET_KEY"] = "YOUR_SECRET_KEY_HERE"
 
+# Create a serializer for secure token generation
+s = URLSafeTimedSerializer(app.config["SECRET_KEY"])
+
 # Yahoo SMTP Configuration
-app.config["MAIL_SERVER"] = "smtp.mail.yahoo.com"
-app.config["MAIL_PORT"] = 587
-app.config["MAIL_USE_TLS"] = True
-app.config["MAIL_USE_SSL"] = False
+app.config["MAIL_SERVER"] = "smtp.gmail.com"  # ✅ Change Yahoo to Gmail
+app.config["MAIL_PORT"] = 587                 # ✅ Same as before
+app.config["MAIL_USE_TLS"] = True             # ✅ Keep TLS enabled
+app.config["MAIL_USE_SSL"] = False            # ✅ Keep SSL disabled
 
 # Hardcoded Yahoo Email Credentials (Needs Security Improvement Later)
-app.config["MAIL_USERNAME"] = "snperry890@yahoo.com"
-app.config["MAIL_PASSWORD"] = "lcogyejknxhbwrof"
-app.config["MAIL_DEFAULT_SENDER"] = "snperry890@yahoo.com"
+app.config["MAIL_USERNAME"] = "ifttrading0@gmail.com"
+app.config["MAIL_PASSWORD"] = "doyl ipwa tvii axiu"
+app.config["MAIL_DEFAULT_SENDER"] = "ifttrading0@gmail.com"
 
 # Initialize Extensions
 db = SQLAlchemy(app)
@@ -39,6 +44,9 @@ def hash_data(data):
 
 def check_hashed_data(hashed_data, original_data):
     return bcrypt.check_password_hash(hashed_data, original_data)
+
+# Disable the default unauthorized message
+login_manager.login_message = None
 
 # UserRoles Model
 class UserRoles(db.Model):
@@ -148,24 +156,15 @@ def admin_required(f):
 # Initialize database & Admin
 with app.app_context():
     db.create_all()
+    
+    # Ensure 'admin' role exists
     if not UserRoles.query.filter_by(role_name="admin").first():
-        db.session.add(UserRoles(role_name="admin", permissions="all"))
+        db.session.add(UserRoles(id=1, role_name="admin", permissions="all"))
         db.session.commit()
-    
-    admin_role = UserRoles.query.filter_by(role_name="admin").first()
-    
-    if not Users.query.filter_by(username="admin").first():
-        db.session.add(Users(
-            username="admin",
-            full_name="Admin User",
-            email="admin@example.com",
-            password=bcrypt.generate_password_hash("admin123").decode('utf-8'),
-            phone=hash_data("1234567890"),
-            ssn=hash_data("000-00-0000"),
-            dob=hash_data("2000-01-01"),
-            citizenship="USA",
-            role_id=admin_role.id
-        ))
+
+    # ✅ Ensure 'user' role exists
+    if not UserRoles.query.filter_by(role_name="user").first():
+        db.session.add(UserRoles(id=2, role_name="user", permissions="basic"))
         db.session.commit()
 
 def send_otp(email):
@@ -190,18 +189,35 @@ def verify():
     if "pending_user_id" not in session:
         return redirect(url_for("login"))
 
+    if "otp_attempts" not in session:
+        session["otp_attempts"] = 0  # Initialize if not set
+
     if request.method == "POST":
         entered_otp = request.form.get("otp")
 
         if int(entered_otp) == session.get("otp_code"):
+            # Correct OTP → Reset failed attempts
+            session.pop("otp_attempts", None)  
+            session.pop('_flashes', None)
+
             user = Users.query.get(session["pending_user_id"])
             login_user(user)
+
+            # Remove OTP session values
             session.pop("otp_code", None)
             session.pop("pending_user_id", None)
 
             return redirect(url_for("admin") if user.role_id == UserRoles.query.filter_by(role_name="admin").first().id else url_for("portfolio"))
-        else:
-            flash("Invalid code. Please try again.", "danger")
+
+        # Incorrect OTP → Increase failed attempt count
+        session["otp_attempts"] += 1
+
+        # After 3 failed OTP attempts, redirect to failed_login page
+        if session["otp_attempts"] >= 3:
+            session.pop("otp_attempts", None)  # Reset after lockout
+            return redirect(url_for("failed_login"))
+
+        flash("Invalid verification code. Please try again.", "danger")
 
     return render_template('verify.html')
 
@@ -227,6 +243,9 @@ def admin():
 
 @app.route('/login', methods=["GET", "POST"])
 def login():
+    if "login_attempts" not in session:
+        session["login_attempts"] = 0  # Initialize if not set
+
     if request.method == "POST":
         username_email = request.form.get("username_email")
         password = request.form.get("password")
@@ -234,50 +253,98 @@ def login():
         user = Users.query.filter((Users.username == username_email) | (Users.email == username_email)).first()
 
         if user and bcrypt.check_password_hash(user.password, password):
+            # Correct login → Reset failed attempts
+            session.pop("login_attempts", None)  
+            session.pop('_flashes', None)
+
+            # Proceed to 2FA
             session["pending_user_id"] = user.id
             send_otp(user.email)
             return redirect(url_for("verify"))
+
+        # Incorrect login → Increase failed attempt count
+        session["login_attempts"] += 1
+
+        # After 3 failed attempts, redirect to failed_login page
+        if session["login_attempts"] >= 3:
+            session.pop("login_attempts", None)  # Reset after lockout
+            return redirect(url_for("failed_login"))
+
+        flash("Invalid username or password. Please try again.", "danger")
 
     return render_template('login.html')
 
 @app.route('/signup', methods=["GET", "POST"])
 def signup():
+    errors = []
+
     if request.method == "POST":
         full_name = request.form.get("full_name")
-        username = request.form.get("username")
+        username = request.form.get("username")  # ✅ FIX: ADD THIS LINE
         email = request.form.get("email")
-        phone, ssn, dob = map(hash_data, [request.form.get("phone"), request.form.get("ssn"), request.form.get("dob")])
+        phone, ssn, dob = request.form.get("phone"), request.form.get("ssn"), request.form.get("dob")
         citizenship = request.form.get("citizenship")
         password = request.form.get("password")
         confirm_password = request.form.get("confirm_password")
 
+        # Ensure username is unique
+        if Users.query.filter_by(username=username).first():
+            errors.append("Username is already taken.")
+
+        # Ensure passwords match
         if password != confirm_password:
-            return "Passwords do not match!"
+            errors.append("Passwords do not match!")
 
+        # Validate username length (Optional)
+        if len(username) < 3 or len(username) > 20:
+            errors.append("Username must be between 3 and 20 characters.")
+
+        # Validate password complexity
+        password_regex = r"^(?=.*[A-Z].*[A-Z])(?=.*[a-z].*[a-z])(?=.*\d.*\d)(?=.*[@$!%*?&].*[@$!%*?&]).{14,}$"
+        if not re.match(password_regex, password):
+            errors.append("Password must meet security requirements.")
+
+        # Ensure user is at least 18 years old
+        try:
+            birth_date = datetime.strptime(dob, "%Y-%m-%d")
+            age = (datetime.today() - birth_date).days // 365
+            if age < 18:
+                errors.append("You must be at least 18 years old to register.")
+        except ValueError:
+            errors.append("Invalid date of birth format.")
+
+        # Validate phone number (must be exactly 10 digits)
+        if not re.fullmatch(r"\d{10}", phone):
+            errors.append("Phone number must be exactly 10 digits.")
+
+        # Validate SSN (must be exactly 9 digits)
+        if not re.fullmatch(r"\d{9}", ssn):
+            errors.append("SSN must be exactly 9 digits.")
+
+        # If errors exist, return them to the user
+        if errors:
+            return render_template("signup.html", errors=errors)
+
+        # Hash sensitive data before storing
         hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
-
-        default_role = UserRoles.query.filter_by(role_name="user").first()
-        if not default_role:
-            default_role = UserRoles(role_name="user", permissions="basic")
-            db.session.add(default_role)
-            db.session.commit()
 
         db.session.add(Users(
             full_name=full_name,
-            username=username,
+            username=username,  # ✅ FIXED: NOW username IS DEFINED
             email=email,
-            phone=phone,
-            ssn=ssn,
-            dob=dob,
+            phone=hash_data(phone),
+            ssn=hash_data(ssn),
+            dob=hash_data(dob),
             citizenship=citizenship,
-            password=hashed_password,
-            role_id=default_role.id
+            password=hashed_password
         ))
         db.session.commit()
 
+        flash("Account created successfully! Please log in.", "success")
         return redirect(url_for("login"))
 
-    return render_template('signup.html')
+    return render_template('signup.html', errors=errors)
+
 
 @app.route('/logout')
 @login_required
@@ -471,6 +538,72 @@ def add_stock():
         flash('Stock added successfully!')
         return redirect(url_for('admin'))
     return render_template("add_stock.html")
+
+@app.route('/failed_login')
+def failed_login():
+    return render_template('failed_login.html')
+
+@app.route('/forgot_password', methods=["GET", "POST"])
+def forgot_password():
+    if request.method == "POST":
+        email = request.form.get("email")
+        user = Users.query.filter_by(email=email).first()
+
+        if user:
+            # Generate a secure token
+            token = s.dumps(email, salt="password-reset")
+
+            # Generate reset link
+            reset_link = url_for('reset_password', token=token, _external=True)
+
+            # Send email with reset link
+            msg = Message("Password Reset Request", sender=app.config["MAIL_DEFAULT_SENDER"], recipients=[email])
+            msg.body = f"Click the link to reset your password: {reset_link}"
+            mail.send(msg)
+
+            flash("A password reset link has been sent to your email.", "info")
+        else:
+            flash("Email not found. Please try again.", "danger")
+
+    return render_template("forgotpassword.html")
+
+@app.route('/reset_password/<token>', methods=["GET", "POST"])
+def reset_password(token):
+    try:
+        # Verify token and extract email
+        email = s.loads(token, salt="password-reset", max_age=600)  # 10-minute expiry
+    except:
+        flash("The reset link is invalid or expired.", "danger")
+        return redirect(url_for("forgot_password"))
+
+    user = Users.query.filter_by(email=email).first()
+    if not user:
+        flash("User not found.", "danger")
+        return redirect(url_for("forgot_password"))
+
+    if request.method == "POST":
+        password = request.form.get("password")
+        confirm_password = request.form.get("confirm_password")
+
+        # 1️⃣ Check if passwords match
+        if password != confirm_password:
+            flash("Passwords do not match!", "danger")
+            return render_template("resetpassword.html", token=token)
+
+        # 2️⃣ Validate password complexity (14+ chars, 2 uppercase, 2 lowercase, 2 numbers, 2 special characters)
+        password_regex = r"^(?=.*[A-Z].*[A-Z])(?=.*[a-z].*[a-z])(?=.*\d.*\d)(?=.*[@$!%*?&].*[@$!%*?&]).{14,}$"
+        if not re.match(password_regex, password):
+            flash("Password must meet security requirements.", "danger")
+            return render_template("resetpassword.html", token=token)
+
+        # 3️⃣ Hash and update password in DB
+        user.password = bcrypt.generate_password_hash(password).decode('utf-8')
+        db.session.commit()
+
+        flash("Password successfully reset! Please log in.", "success")
+        return redirect(url_for("login"))
+
+    return render_template("resetpassword.html", token=token)
 
 if __name__ == '__main__':
     with app.app_context():
