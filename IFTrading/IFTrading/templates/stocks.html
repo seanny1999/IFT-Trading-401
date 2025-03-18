@@ -27,65 +27,29 @@
             </tr>
         </thead>
         <tbody>
-            <!-- Various Stocks -->
+            {% for stock in stocks %}
             <tr>
-                <td>AAPL</td>
-                <td>Apple Inc.</td>
-                <td>235.93</td>
-                <td>3.55T</td>
-                <td>54.26M</td>
+                <td>{{ stock.ticker }}</td>
+                <td>{{ stock.company }}</td>
+                <td>{{ stock.price }}</td>
+                <td>{{ stock.marketcap }}</td>
+                <td>{{ stock.volume }}</td>
                 <td>
-                    <button class="btn btn-success trade-btn" data-bs-toggle="modal" data-bs-target="#tradeModal" data-action="buy" data-ticker="AAPL">Buy</button>
-                    <button class="btn btn-danger trade-btn" data-bs-toggle="modal" data-bs-target="#tradeModal" data-action="sell" data-ticker="AAPL">Sell</button>
+                    <button class="btn btn-success trade-btn"
+                        data-bs-toggle="modal" data-bs-target="#tradeModal"
+                        data-action="buy" data-ticker="{{ stock.ticker }}">
+                        Buy
+                    </button>
+                    <button class="btn btn-danger trade-btn"
+                        data-bs-toggle="modal" data-bs-target="#tradeModal"
+                        data-action="sell" data-ticker="{{ stock.ticker }}">
+                        Sell
+                    </button>
                 </td>
             </tr>
-            <tr>
-                <td>TSLA</td>
-                <td>Tesla Inc.</td>
-                <td>272.04</td>
-                <td>852.43B</td>
-                <td>80.17M</td>
-                <td>
-                    <button class="btn btn-success trade-btn" data-bs-toggle="modal" data-bs-target="#tradeModal" data-action="buy" data-ticker="TSLA">Buy</button>
-                    <button class="btn btn-danger trade-btn" data-bs-toggle="modal" data-bs-target="#tradeModal" data-action="sell" data-ticker="TSLA">Sell</button>
-                </td>
-            </tr>
-            <tr>
-                <td>INTC</td>
-                <td>Intel Corp</td>
-                <td>21.33</td>
-                <td>92.00B</td>
-                <td>112.20M</td>
-                <td>
-                    <button class="btn btn-success trade-btn" data-bs-toggle="modal" data-bs-target="#tradeModal" data-action="buy" data-ticker="INTC">Buy</button>
-                    <button class="btn btn-danger trade-btn" data-bs-toggle="modal" data-bs-target="#tradeModal" data-action="sell" data-ticker="INTC">Sell</button>
-                </td>
-            </tr>
-            <tr>
-                <td>MSFT</td>
-                <td>Microsoft Corp</td>
-                <td>388.61</td>
-                <td>2.89T</td>
-                <td>24.70M</td>
-                <td>
-                    <button class="btn btn-success trade-btn" data-bs-toggle="modal" data-bs-target="#tradeModal" data-action="buy" data-ticker="MSFT">Buy</button>
-                    <button class="btn btn-danger trade-btn" data-bs-toggle="modal" data-bs-target="#tradeModal" data-action="sell" data-ticker="MSFT">Sell</button>
-                </td>
-            </tr>
-            <tr>
-                <td>BA</td>
-                <td>Boeing Co</td>
-                <td>158.90</td>
-                <td>119.05B</td>
-                <td>7.42M</td>
-                <td>
-                    <button class="btn btn-success trade-btn" data-bs-toggle="modal" data-bs-target="#tradeModal" data-action="buy" data-ticker="BA">Buy</button>
-                    <button class="btn btn-danger trade-btn" data-bs-toggle="modal" data-bs-target="#tradeModal" data-action="sell" data-ticker="BA">Sell</button>
-                </td>
-            </tr>
+            {% endfor %}
         </tbody>
     </table>
-</div>
 </div>
 
 <!-- Bootstrap Modal -->
@@ -97,7 +61,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <form action="{{ url_for('trade_stock') }}" method="POST">
+                <form action="{{ url_for('confirm_trade') }}" method="POST">
                     <input type="hidden" id="tradeAction" name="action">
                     <input type="hidden" id="tradeTicker" name="ticker">
                     
@@ -114,7 +78,7 @@
                         </select>
                     </div>
                     
-                    <button type="submit" class="btn btn-primary">Confirm Trade</button>
+                    <button type="submit" class="btn btn-primary">Review Trade</button>
                 </form>
             </div>
         </div>

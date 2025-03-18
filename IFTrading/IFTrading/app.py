@@ -74,32 +74,15 @@ class Users(UserMixin, db.Model):
 class Portfolio(db.Model):
     portfolio_id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    stock_id = db.Column(db.Integer, db.ForeignKey('stocks.stock_id'), nullable=False)
+    stock_id = db.Column(db.Integer, db.ForeignKey('stock.id'), nullable=False)
     quantity_owned = db.Column(db.Integer, nullable=False)
     last_updated = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-# Stocks Model
-class Stocks(db.Model):
-    stock_id = db.Column(db.Integer, primary_key=True)
-    role_id = db.Column(db.Integer, db.ForeignKey('user_roles.id'), nullable=False)
-    ticker = db.Column(db.String(10), unique=True, nullable=False)
-    company_name = db.Column(db.String(100), unique=True, nullable=False)
-    initial_price = db.Column(db.Float, nullable=False)
-    current_price = db.Column(db.Float, nullable=False)
-    daily_low = db.Column(db.Float, nullable=False)
-    daily_high = db.Column(db.Float, nullable=False)
-    market_cap = db.Column(db.String(50), nullable=False)
-    volume = db.Column(db.Integer, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-    def __repr__(self):
-        return f"<Stock {self.company_name}, Ticker: {self.ticker}, Current Price: {self.current_price}>"
-    
 # Orders Model
 class Orders(db.Model):
     order_id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    stock_id = db.Column(db.Integer, db.ForeignKey('stocks.stock_id'), nullable=False)
+    stock_id = db.Column(db.Integer, db.ForeignKey('stock.id'), nullable=False)
     order_type = db.Column(db.String(10), nullable=False) 
     quantity = db.Column(db.Integer, nullable=False)
     price_at_order = db.Column(db.Float, nullable=False)
@@ -112,7 +95,7 @@ class Transactions(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     order_id = db.Column(db.Integer, db.ForeignKey('orders.order_id'), nullable=False)
-    stock_id = db.Column(db.Integer, db.ForeignKey('stocks.stock_id'), nullable=False)
+    stock_id = db.Column(db.Integer, db.ForeignKey('stock.id'), nullable=False)
     company_name = db.Column(db.String(100), nullable=False)
     ticker = db.Column(db.String(10),nullable=False)
     transaction_type = db.Column(db.String(10), nullable=False)  # Buy or Sell
@@ -360,72 +343,91 @@ def profile():
 @app.route('/portfolio')
 @login_required
 def portfolio():
-    portfolio_entries = Portfolio.query.filter_by(user_id=current_user.id).all()
     holdings = []
-    for entry in portfolio_entries:
-        stock = Stocks.query.get(entry.stock_id)
-        if stock:
+    tickers = db.session.query(Transactions.ticker).filter_by(user_id=current_user.id).distinct()
+    for ticker_obj in tickers:
+        ticker = ticker_obj[0]
+        total_buys = db.session.query(db.func.sum(Transactions.quantity)).filter_by(
+            ticker=ticker, transaction_type='Buy', user_id=current_user.id).scalar() or 0
+        total_sells = db.session.query(db.func.sum(Transactions.quantity)).filter_by(
+            ticker=ticker, transaction_type='Sell', user_id=current_user.id).scalar() or 0
+        net_shares = total_buys - total_sells
+        if net_shares > 0:
+            stock = Stock.query.filter_by(ticker=ticker).first()
             holdings.append({
-                'ticker': stock.ticker,
-                'company': stock.company_name,
-                'quantity': entry.quantity_owned,
-                'price': stock.current_price,
-                'value': entry.quantity_owned * stock.current_price
+                'ticker': ticker,
+                'company': stock.company,
+                'quantity': net_shares,
+                'price': float(stock.price),
+                'value': float(net_shares) * float(stock.price)
             })
-    
+
     return render_template('portfolio.html', holdings=holdings, balance=current_user.balance)
 
-@app.route('/trade_stock', methods=["GET", "POST"])
-def trade_stock():
+@app.route('/confirm_trade', methods=["GET", "POST"])
+@login_required
+def confirm_trade():
     action = request.form.get("action")
     ticker = request.form.get("ticker")
     try:
         shares = int(request.form.get("shares"))
     except (ValueError, TypeError):
-        flash("Invalid number of shares.", "danger")  
-        return redirect(url_for("portfolio"))
+        flash("Invalid number of shares.", "danger")
+        return redirect(url_for("stocks"))
     order_type = request.form.get("orderType")
-
-    stock_prices = {
-        "AAPL": 235.93,
-        "TSLA": 272.04,
-        "INTC": 21.33,
-        "MSFT": 388.61,
-        "BA": 158.90
-    }
-    stock_names = {
-        "AAPL": "Apple Inc.",
-        "TSLA": "Tesla Inc.",
-        "INTC": "Intel Corp",
-        "MSFT": "Microsoft Corp",
-        "BA": "Boeing Co"
-    }
-
-    if ticker not in stock_prices:
+    
+    # stock details pulled from db
+    stock = Stock.query.filter_by(ticker=ticker).first()
+    if not stock:
         flash("Invalid stock ticker!", "danger")
-        return redirect(url_for("portfolio"))
+        return redirect(url_for("stocks"))
+    
+    #total price
+    price = float(stock.price)
+    total_amount = shares * price
+    
+    return render_template(
+        "confirmation.html", 
+        action=action, 
+        ticker=ticker, 
+        shares=shares, 
+        order_type=order_type, 
+        price=price, 
+        total_amount=total_amount,
+        company=stock.company
+    )
 
-    price = stock_prices[ticker]
-    company = stock_names[ticker]
-
+@app.route('/execute_trade', methods=["GET", "POST"])
+@login_required
+def execute_trade():
+    action = request.form.get("action")
+    ticker = request.form.get("ticker")
+    try:
+        shares = int(request.form.get("shares"))
+    except (ValueError, TypeError):
+        flash("Invalid number of shares.", "danger")
+        return redirect(url_for("stocks"))
+    order_type = request.form.get("order_type")
+    
+    # Get stock details
+    stock = Stock.query.filter_by(ticker=ticker).first()
+    if not stock:
+        flash("Invalid stock ticker!", "danger")
+        return redirect(url_for("stocks"))
+    price = float(stock.price)
+    
     if action == "buy":
         total_cost = shares * price
-        user_balance = current_user.balance if current_user.balance is not None else 0.0
-
-        flash(f"Balance before purchase: ${user_balance:.2f}", "info")
-
+        user_balance = current_user.balance or 0.0
         if user_balance < total_cost:
             flash("Insufficient funds!", "danger")
-            return redirect(url_for("portfolio"))
-        # Deduct funds and update balance
+            return redirect(url_for("stocks"))
         current_user.balance = user_balance - total_cost
 
-        flash(f"Updated balance after purchase: ${current_user.balance:.2f}", "info")
-
-        # Create a Buy order
+        # Create buy order
         new_order = Orders(
             user_id=current_user.id,
-            stock_id=1,  
+            stock_id=stock.id,
             order_type="Buy",
             quantity=shares,
             price_at_order=price,
@@ -434,52 +436,49 @@ def trade_stock():
         db.session.add(new_order)
         db.session.commit()
 
-        # Record the transaction
         new_transaction = Transactions(
             user_id=current_user.id,
             order_id=new_order.order_id,
-            stock_id=1,  
-            company_name=company,
+            stock_id=stock.id,
+            company_name=stock.company,
             ticker=ticker,
             transaction_type="Buy",
             quantity=shares,
             total_amount=total_cost
         )
         db.session.add(new_transaction)
+        db.session.commit()
 
-        # Update portfolio entry
-        portfolio_entry = Portfolio.query.filter_by(user_id=current_user.id, stock_id=1).first()
+        portfolio_entry = Portfolio.query.filter_by(user_id=current_user.id, stock_id=stock.id).first()
         if portfolio_entry:
             portfolio_entry.quantity_owned += shares
             portfolio_entry.last_updated = datetime.utcnow()
         else:
             new_portfolio_entry = Portfolio(
                 user_id=current_user.id,
-                stock_id=1,  
+                stock_id=stock.id,
                 quantity_owned=shares
             )
             db.session.add(new_portfolio_entry)
-
         db.session.commit()
         flash("Stock purchased successfully!", "success")
-        return redirect(url_for("portfolio"))
-    elif action == "sell":
-        user_shares = db.session.query(db.func.sum(Transactions.quantity)).filter_by(ticker=ticker, transaction_type='Buy', user_id=current_user.id).scalar() or 0
-        sold_shares = db.session.query(db.func.sum(Transactions.quantity)).filter_by(ticker=ticker, transaction_type='Sell', user_id=current_user.id).scalar() or 0
-        net_shares = user_shares - sold_shares
 
+    elif action == "sell":
+        total_gain = shares * price
+        # check if theres enough stock to sell
+        user_shares = db.session.query(db.func.sum(Transactions.quantity)).filter_by(
+            ticker=ticker, transaction_type='Buy', user_id=current_user.id).scalar() or 0
+        sold_shares = db.session.query(db.func.sum(Transactions.quantity)).filter_by(
+            ticker=ticker, transaction_type='Sell', user_id=current_user.id).scalar() or 0
+        net_shares = user_shares - sold_shares
         if shares > net_shares:
             flash("Not enough shares to sell!", "danger")
-            return redirect(url_for("portfolio"))
+            return redirect(url_for("stocks"))
+        current_user.balance += total_gain
 
-        total_gain = shares * price
-        user_balance = current_user.balance if current_user.balance is not None else 0.0
-        current_user.balance = user_balance + total_gain
-        
-        # Create a Sell order
         new_order = Orders(
             user_id=current_user.id,
-            stock_id=1,  
+            stock_id=stock.id,
             order_type="Sell",
             quantity=shares,
             price_at_order=price,
@@ -488,12 +487,11 @@ def trade_stock():
         db.session.add(new_order)
         db.session.commit()
 
-        # Record the transaction
         new_transaction = Transactions(
             user_id=current_user.id,
             order_id=new_order.order_id,
-            stock_id=1,  
-            company_name=company,
+            stock_id=stock.id,
+            company_name=stock.company,
             ticker=ticker,
             transaction_type="Sell",
             quantity=shares,
@@ -502,15 +500,25 @@ def trade_stock():
         db.session.add(new_transaction)
         db.session.commit()
 
+        portfolio_entry = Portfolio.query.filter_by(user_id=current_user.id, stock_id=stock.id).first()
+        if portfolio_entry:
+            portfolio_entry.quantity_owned -= shares
+            if portfolio_entry.quantity_owned <= 0:
+                db.session.delete(portfolio_entry)
+            else:
+                portfolio_entry.last_updated = datetime.utcnow()
+            db.session.commit()
         flash("Stock sold successfully!", "success")
-        return redirect(url_for("portfolio"))
     else:
         flash("Invalid trade action.", "danger")
-        return redirect(url_for("portfolio"))
+        return redirect(url_for("stocks"))
+    
+    return redirect(url_for("portfolio"))
     
 @app.route('/stocks')
 def stocks():
-    return render_template('stocks.html')
+    stocks_list = Stock.query.all()
+    return render_template('stocks.html', stocks=stocks_list)
 
 @app.route('/about')
 def about():
