@@ -340,6 +340,36 @@ def logout():
 def profile():
     return render_template('profile.html', full_name=current_user.full_name, email=current_user.email, citizenship=current_user.citizenship)
 
+@app.route('/confirm_transaction', methods=["GET", "POST"])
+@login_required
+def confirm_transaction():
+    action = request.form.get("action")
+    try:
+        amount = float(request.form.get("amount"))
+    except (ValueError, TypeError):
+        flash("Invalid amount. Please enter a valid number.", "danger")
+        return redirect(url_for("profile"))
+    
+    if amount <= 0:
+        flash("Amount must be greater than zero.", "warning")
+        return redirect(url_for("profile"))
+    
+    if action == "deposit":
+        current_user.balance += amount
+        flash(f"Successfully deposited ${amount:.2f}.", "success")
+    elif action == "withdraw":
+        if amount > current_user.balance:
+            flash("Insufficient funds for withdrawal.", "danger")
+            return redirect(url_for("profile"))
+        current_user.balance -= amount
+        flash(f"Successfully withdrew ${amount:.2f}.", "success")
+    else:
+        flash("Invalid transaction type.", "danger")
+        return redirect(url_for("profile"))
+    
+    db.session.commit()
+    return redirect(url_for("profile"))
+
 @app.route('/portfolio')
 @login_required
 def portfolio():

@@ -7,12 +7,42 @@
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
+<!-- Match template Colors/Styles -->
+<style>
+    :root {
+        --bs-primary: #600000;  /* Dark red */
+        --bs-secondary: #FFD700; /* Gold */
+        --bs-dark: #000000;      /* Black */
+    }
+
+    body {
+        background-color: var(--bs-primary) !important;
+        color: var(--bs-dark) !important;
+    }
+
+    .table, .table th, .table td {
+        color: #000000 !important;
+    }
+
+    .modal-content {
+        background-color: var(--bs-primary);
+        color: var(--bs-dark);
+        border: none;
+    }
+    .modal-header,
+    .modal-body,
+    .modal-footer {
+        background-color: inherit;
+        color: inherit;
+    }
+</style>
+
 <div class="container">
     <h2 class="text-center mt-4">User Portfolio</h2>
     
     <!-- Total Balance -->
     <div class="text-center mt-3">
-        <h4>Total Balance</h4>
+        <h4>Total Cash</h4>
         <h2 class="text-success">${{ balance }} USD</h2>
     </div>
 
