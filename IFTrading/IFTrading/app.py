@@ -572,9 +572,9 @@ def add_stock():
 
         new_stock = Stock(ticker, company, price, shares, marketcap, volume)
         db.session.add(new_stock)
-        db.session.commit() 
-        flash('Stock added successfully!')
-        return redirect(url_for('admin'))
+        db.session.commit()
+        flash("Stock added successfully!")
+        return redirect(url_for('add_stock'))
     return render_template("add_stock.html")
 
 @app.route('/failed_login')
