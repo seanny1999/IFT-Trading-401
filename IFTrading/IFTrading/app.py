@@ -121,7 +121,7 @@ class Stock(db.Model):
     price = db.Column(Numeric(10, 2), nullable=False)
     ##### shares = db.Column(db.String(100), nullable=False) 
     ##### marketcap = db.Column(db.String(100), nullable=True)
-    volume = db.Column(db.String(100), nullable=True)
+    volume = db.Column(Numeric(10), nullable=False)
 
     def __init__(self, ticker, company, price, volume): #### Took out (shares, marketcap, )
         self.ticker = ticker
