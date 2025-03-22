@@ -17,16 +17,16 @@
 
     body {
         background-color: var(--bs-primary) !important;
-        color: var(--bs-dark) !important;
+        color: #fff !important; /* changed from var(--bs-dark) */
     }
 
     .table, .table th, .table td {
-        color: #000000 !important;
+        color: #fff !important; /* changed from var(--bs-dark) */
     }
 
     .modal-content {
         background-color: var(--bs-primary);
-        color: var(--bs-dark);
+        color: white;
         border: none;
     }
     .modal-header,
@@ -39,8 +39,9 @@
 
 <!-- Stock Holdings Table -->
 <div class="container">
-        <h2 class="text-center mt-4">Available Stocks</h2>
+    <h2 class="text-center mt-4">Available Stocks</h2>
 </div>
+
 <div class="mt-5">
     <h4 class="text-center"></h4>
     <table class="table table-striped mt-3">
@@ -59,8 +60,17 @@
             <tr>
                 <td>{{ stock.ticker }}</td>
                 <td>{{ stock.company }}</td>
-                <td>{{ stock.price }}</td>
-                <td>{{ stock.marketcap }}</td>
+
+                <!-- 1) Format price to 2 decimals -->
+                <td>{{ "%.2f"|format(stock.price) }}</td>
+
+                <!-- 2) Compute Market Cap as price * volume, 
+                        converting volume to int if not empty -->
+                <td>
+                    {% set vol = stock.volume|int if stock.volume else 0 %}
+                    {{ "%.2f"|format(stock.price * vol) }}
+                </td>
+
                 <td>{{ stock.volume }}</td>
                 <td>
                     <button class="btn btn-success trade-btn"
@@ -80,7 +90,7 @@
     </table>
 </div>
 
-<!-- Bootstrap Modal -->
+<!-- Bootstrap Modal for trading -->
 <div class="modal fade" id="tradeModal" tabindex="-1" aria-labelledby="tradeModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -92,12 +102,12 @@
                 <form action="{{ url_for('confirm_trade') }}" method="POST">
                     <input type="hidden" id="tradeAction" name="action">
                     <input type="hidden" id="tradeTicker" name="ticker">
-                    
+
                     <div class="mb-3">
                         <label for="shares" class="form-label">Number of Shares</label>
                         <input type="number" class="form-control" id="shares" name="shares" min="1" required>
                     </div>
-                    
+
                     <div class="mb-3">
                         <label for="orderType" class="form-label">Order Type</label>
                         <select class="form-select" id="orderType" name="orderType" required>
@@ -105,7 +115,7 @@
                             <option value="limit">Limit Order</option>
                         </select>
                     </div>
-                    
+
                     <button type="submit" class="btn btn-primary">Review Trade</button>
                 </form>
             </div>
@@ -113,7 +123,7 @@
     </div>
 </div>
 
-<!-- Bootstrap Javascript-->
+<!-- Bootstrap JS -->
 <script>
 document.addEventListener("DOMContentLoaded", function () {
     var tradeModal = document.getElementById("tradeModal");
@@ -125,7 +135,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
         document.getElementById("tradeAction").value = action;
         document.getElementById("tradeTicker").value = ticker;
-        document.getElementById("tradeModalLabel").innerText = (action === "buy" ? "Buy " : "Sell ") + ticker;
+        document.getElementById("tradeModalLabel").innerText = 
+            (action === "buy" ? "Buy " : "Sell ") + ticker;
     });
 });
 </script>

@@ -3,8 +3,57 @@
 {% block title %}Transaction History{% endblock %}
 
 {% block content %}
-<div class="container">
-    <h2>Transaction History</h2>
-    <p>View your past stock trades and account activities.</p>
+<div class="container mt-4">
+
+    <style>
+    
+        body {
+            background-color: var(--bs-primary) !important;
+            color: #fff !important; /* changed from var(--bs-dark) */
+        }
+    
+        .table, .table th, .table td {
+            color: #fff !important; /* changed from var(--bs-dark) */
+        }
+    
+    </style>
+
+    <!-- Page Header -->
+    <h2 class="mb-3">Transaction History</h2>
+    <p><strong>User:</strong> {{ username }} ({{ email }})</p>
+
+    <!-- Transaction Table -->
+    <table class="table table-striped table-bordered">
+        <thead>
+            <tr>
+                <th>Date/Time</th>
+                <th>Ticker</th>
+                <th>Transaction Type</th>
+                <th>Quantity</th>
+                <th>Price Per Share</th>
+                <th>Total Amount</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for tx in transactions %}
+            <tr>
+                <!-- The timestamp when the transaction occurred -->
+                <td>{{ tx.timestamp }}</td>
+
+                <!-- Basic stock info from the transaction record -->
+                <td>{{ tx.ticker }}</td>
+                <td>{{ tx.transaction_type }}</td>
+                <td>{{ tx.quantity }}</td>
+
+                <!-- Show price per share by dividing total amount by quantity -->
+                <td>${{ "%.2f"|format(tx.total_amount / tx.quantity) }}</td>
+
+                <!-- Show total amount of the transaction -->
+                <td>${{ "%.2f"|format(tx.total_amount) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
 </div>
 {% endblock %}

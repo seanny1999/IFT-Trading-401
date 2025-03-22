@@ -10,6 +10,9 @@ from datetime import datetime
 from flask_migrate import Migrate
 from itsdangerous import URLSafeTimedSerializer
 import re
+from sqlalchemy import Numeric
+import threading
+import time
 
 app = Flask(__name__)
 
@@ -38,6 +41,8 @@ mail = Mail(app)
 login_manager = LoginManager(app)
 login_manager.login_view = "login"
 migrate = Migrate(app, db)
+price_thread = None  # global or module-level variable to track our thread
+
 # Hashing Functions
 def hash_data(data):
     return bcrypt.generate_password_hash(data).decode('utf-8')
@@ -85,7 +90,7 @@ class Orders(db.Model):
     stock_id = db.Column(db.Integer, db.ForeignKey('stock.id'), nullable=False)
     order_type = db.Column(db.String(10), nullable=False) 
     quantity = db.Column(db.Integer, nullable=False)
-    price_at_order = db.Column(db.Float, nullable=False)
+    price_at_order = db.Column(db.DECIMAL(10, 2), nullable=False)
     order_status = db.Column(db.String(20), nullable=False, default="Pending")
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
     cancel_timestamp = db.Column(db.DateTime, nullable=True)
@@ -100,7 +105,7 @@ class Transactions(db.Model):
     ticker = db.Column(db.String(10),nullable=False)
     transaction_type = db.Column(db.String(10), nullable=False)  # Buy or Sell
     quantity = db.Column(db.Integer, nullable=False)
-    total_amount = db.Column(db.Float, nullable=False)
+    total_amount = db.Column(db.DECIMAL(10, 2), nullable=False)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
     cancel_timestamp = db.Column(db.DateTime, nullable=True)
 
@@ -113,18 +118,27 @@ class Stock(db.Model):
     id = db.Column(db.Integer, primary_key=True) 
     ticker = db.Column(db.String(100), nullable=False) 
     company = db.Column(db.String(100), nullable=False) 
-    price = db.Column(db.Float, nullable=False)
-    shares = db.Column(db.String(100), nullable=False) 
-    marketcap = db.Column(db.String(100), nullable=True)
+    price = db.Column(Numeric(10, 2), nullable=False)
+    ##### shares = db.Column(db.String(100), nullable=False) 
+    ##### marketcap = db.Column(db.String(100), nullable=True)
     volume = db.Column(db.String(100), nullable=True)
 
-    def __init__(self, ticker, company, price, shares, marketcap, volume):
+    def __init__(self, ticker, company, price, volume): #### Took out (shares, marketcap, )
         self.ticker = ticker
         self.company = company
         self.price = price
-        self.shares = shares
-        self.marketcap = marketcap
+        ##### self.shares = shares
+        ##### self.marketcap = marketcap
         self.volume = volume
+
+@app.before_request
+def start_price_thread():
+    global price_thread
+    # Only start the thread if it hasn't been started before
+    if price_thread is None or not price_thread.is_alive():
+        price_thread = threading.Thread(target=randomize_stock_prices, daemon=True)
+        price_thread.start()
+        print("Background price thread started!")
 
 # Admin access decorator
 def admin_required(f):
@@ -166,6 +180,26 @@ def send_otp(email):
         mail.send(msg)
     except Exception:
         flash("Failed to send verification email. Please check your email configuration.", "danger")
+
+def randomize_stock_prices():
+    while True:
+        with app.app_context():
+            stocks = Stock.query.all()
+            for stock in stocks:
+                old_price = float(stock.price)
+                direction = random.choice([-1, 1])
+                change_percent = random.uniform(0.08, 0.20)
+                new_price = old_price * (1 + direction * change_percent)
+                if new_price < 0.01:
+                    new_price = 0.01
+
+                stock.price = new_price
+
+                print(f"Updated {stock.ticker} from {old_price} to {new_price}")
+
+            db.session.commit()
+
+        time.sleep(5)
 
 @app.route('/verify', methods=["GET", "POST"])
 def verify():
@@ -338,7 +372,17 @@ def logout():
 @app.route('/profile')
 @login_required
 def profile():
-    return render_template('profile.html', full_name=current_user.full_name, email=current_user.email, citizenship=current_user.citizenship)
+    user = current_user  # The logged-in user
+    return render_template(
+        'profile.html',
+        full_name=user.full_name,
+        username=user.username,
+        email=user.email,
+        citizenship=user.citizenship,
+        created_at=user.created_at,
+        updated_at=user.updated_at,
+        balance=user.balance
+    )
 
 @app.route('/confirm_transaction', methods=["GET", "POST"])
 @login_required
@@ -377,10 +421,12 @@ def portfolio():
     tickers = db.session.query(Transactions.ticker).filter_by(user_id=current_user.id).distinct()
     for ticker_obj in tickers:
         ticker = ticker_obj[0]
-        total_buys = db.session.query(db.func.sum(Transactions.quantity)).filter_by(
-            ticker=ticker, transaction_type='Buy', user_id=current_user.id).scalar() or 0
-        total_sells = db.session.query(db.func.sum(Transactions.quantity)).filter_by(
-            ticker=ticker, transaction_type='Sell', user_id=current_user.id).scalar() or 0
+        total_buys = db.session.query(db.func.sum(Transactions.quantity))\
+            .filter_by(ticker=ticker, transaction_type='Buy', user_id=current_user.id)\
+            .scalar() or 0
+        total_sells = db.session.query(db.func.sum(Transactions.quantity))\
+            .filter_by(ticker=ticker, transaction_type='Sell', user_id=current_user.id)\
+            .scalar() or 0
         net_shares = total_buys - total_sells
         if net_shares > 0:
             stock = Stock.query.filter_by(ticker=ticker).first()
@@ -392,6 +438,7 @@ def portfolio():
                 'value': float(net_shares) * float(stock.price)
             })
 
+    # Pass the user’s cash balance to the template
     return render_template('portfolio.html', holdings=holdings, balance=current_user.balance)
 
 @app.route('/confirm_trade', methods=["GET", "POST"])
@@ -445,6 +492,13 @@ def execute_trade():
         flash("Invalid stock ticker!", "danger")
         return redirect(url_for("stocks"))
     price = float(stock.price)
+
+    # -- 1) Convert stock.volume from string to int
+    # If volume is missing or invalid, default to 0
+    try:
+        current_volume = int(stock.volume)
+    except (ValueError, TypeError):
+        current_volume = 0
     
     if action == "buy":
         total_cost = shares * price
@@ -490,12 +544,21 @@ def execute_trade():
                 quantity_owned=shares
             )
             db.session.add(new_portfolio_entry)
+
+        # -- 2) Decrease volume by the shares bought and recalc marketcap
+        current_volume -= shares
+        if current_volume < 0:
+            current_volume = 0
+        stock.volume = str(current_volume)  # store as string, as in your model
+        new_marketcap = float(stock.price) * current_volume
+        stock.marketcap = f"{new_marketcap:.2f}"  # store as string, as in your model
+
         db.session.commit()
         flash("Stock purchased successfully!", "success")
 
     elif action == "sell":
         total_gain = shares * price
-        # check if theres enough stock to sell
+        # check if there's enough stock to sell
         user_shares = db.session.query(db.func.sum(Transactions.quantity)).filter_by(
             ticker=ticker, transaction_type='Buy', user_id=current_user.id).scalar() or 0
         sold_shares = db.session.query(db.func.sum(Transactions.quantity)).filter_by(
@@ -538,13 +601,79 @@ def execute_trade():
             else:
                 portfolio_entry.last_updated = datetime.utcnow()
             db.session.commit()
+
+        # -- 2) Increase volume by the shares sold and recalc marketcap
+        current_volume += shares
+        stock.volume = str(current_volume)
+        new_marketcap = float(stock.price) * current_volume
+        stock.marketcap = f"{new_marketcap:.2f}"
+
+        db.session.commit()
         flash("Stock sold successfully!", "success")
     else:
         flash("Invalid trade action.", "danger")
         return redirect(url_for("stocks"))
     
     return redirect(url_for("portfolio"))
-    
+
+
+@app.route('/review_cash_transaction', methods=["POST"])
+@login_required
+def review_cash_transaction():
+    """Show a confirmation page for deposit/withdraw before finalizing."""
+    action = request.form.get("action")
+    amount_str = request.form.get("amount")
+
+    try:
+        amount = float(amount_str)
+    except ValueError:
+        flash("Invalid amount. Please enter a valid number.", "danger")
+        return redirect(url_for("profile"))
+
+    if amount <= 0:
+        flash("Amount must be greater than zero.", "warning")
+        return redirect(url_for("profile"))
+
+    # Show a new confirmation page with deposit/withdraw details
+    return render_template(
+        "confirmation_cash.html",
+        action=action,
+        amount=amount
+    )
+
+@app.route('/execute_cash_transaction', methods=["POST"])
+@login_required
+def execute_cash_transaction():
+    """Perform the actual deposit/withdraw once user confirms."""
+    action = request.form.get("action")
+    amount_str = request.form.get("amount")
+
+    try:
+        amount = float(amount_str)
+    except ValueError:
+        flash("Invalid amount. Please enter a valid number.", "danger")
+        return redirect(url_for("profile"))
+
+    if amount <= 0:
+        flash("Amount must be greater than zero.", "warning")
+        return redirect(url_for("profile"))
+
+    if action == "deposit":
+        current_user.balance += amount
+        flash(f"Successfully deposited ${amount:.2f}.", "success")
+    elif action == "withdraw":
+        if amount > current_user.balance:
+            flash("Insufficient funds for withdrawal.", "danger")
+            return redirect(url_for("profile"))
+        current_user.balance -= amount
+        flash(f"Successfully withdrew ${amount:.2f}.", "success")
+    else:
+        flash("Invalid transaction type.", "danger")
+        return redirect(url_for("profile"))
+
+    db.session.commit()
+    return redirect(url_for("profile"))
+
 @app.route('/stocks')
 def stocks():
     stocks_list = Stock.query.all()
@@ -555,8 +684,20 @@ def about():
     return render_template('about.html')
 
 @app.route('/history')
+@login_required
 def history():
-    return render_template('history.html')
+    # Pull the user’s transactions in descending chronological order
+    user_transactions = Transactions.query \
+        .filter_by(user_id=current_user.id) \
+        .order_by(Transactions.timestamp.desc()) \
+        .all()
+
+    return render_template(
+        'history.html',
+        username=current_user.username,
+        email=current_user.email,
+        transactions=user_transactions
+    )
 
 @app.route("/admin/add_stock", methods=["GET", "POST"])
 @login_required
@@ -566,11 +707,11 @@ def add_stock():
         ticker = request.form['ticker']
         company = request.form['company']
         price = request.form['price']
-        shares = request.form['shares']
-        marketcap = request.form['marketcap']
+        ####### shares = request.form['shares']
+        ####### marketcap = request.form['marketcap']
         volume = request.form['volume']
 
-        new_stock = Stock(ticker, company, price, shares, marketcap, volume)
+        new_stock = Stock(ticker, company, price, volume) ##### I took out (shares, marketcap, )
         db.session.add(new_stock)
         db.session.commit()
         flash("Stock added successfully!")

@@ -3,6 +3,13 @@
 {% block title %}Order Confirmation{% endblock %}
 
 {% block content %}
+
+<style>
+    body, .container {
+      color: #fff !important;
+    }
+  </style>
+
 <div class="container mt-4">
     <h2>Order Confirmation</h2>
     <p><strong>Action:</strong> {{ action|capitalize }}</p>
@@ -17,7 +24,7 @@
       {% else %}
         Total Gain:
       {% endif %}
-    </strong> ${{ total_amount }}
+    </strong> ${{ "%.2f"|format(total_amount) }}
   </p>
   
   <form action="{{ url_for('execute_trade') }}" method="POST">
