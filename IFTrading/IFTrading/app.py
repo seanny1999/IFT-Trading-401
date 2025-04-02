@@ -718,6 +718,19 @@ def add_stock():
         return redirect(url_for('add_stock'))
     return render_template("add_stock.html")
 
+@app.route("/admin/hours", methods=["GET", "POST"])
+@login_required
+@admin_required
+def hours():
+    return render_template("hours.html")
+
+@app.route("/admin/admin_stock_list")
+@login_required
+@admin_required
+def admin_stock_list():
+    stocks_list = Stock.query.all()
+    return render_template('admin_stock_list.html', stocks=stocks_list)
+
 @app.route('/failed_login')
 def failed_login():
     return render_template('failed_login.html')
