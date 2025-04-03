@@ -40,6 +40,13 @@
 <!-- Stock Holdings Table -->
 <div class="container">
     <h2 class="text-center mt-4">Available Stocks</h2>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, message in messages %}
+            <div class="alert alert-{{ category }}">{{ message }}</div>
+        {% endfor %}
+    {% endif %}
+{% endwith %}
 </div>
 
 <div class="mt-5">

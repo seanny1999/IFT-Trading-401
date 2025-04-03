@@ -5,6 +5,40 @@
 {% block content %}
 <div class="container">
     <h2>Manage Market Hours</h2>
-    <h2>Manage Market Scheduling</h2>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <form action="{{ url_for('hours') }}" method="POST">
+        <div class="mb-3">
+            <label for="stopTrading" class="form-label">Stop Trading</label>
+            <input type="datetime-local" class="form-control" id="stopTrading" name="stopTrading" required>
+        </div>
+
+        <div class="mb-3">
+            <label for="resumeTrading" class="form-label">Resume Trading</label>
+            <input type="datetime-local" class="form-control" id="resumeTrading" name="resumeTrading" required>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Set Hours</button>
+    </form>
+
+    <hr>
+
+    <h3>Scheduled Downtimes</h3>
+    <ul>
+        {% for schedule in schedules %}
+            <li>
+                Stop: {{ schedule.stop_time }} - Resume: {{ schedule.resume_time }}
+            </li>
+        {% else %}
+            <li>No schedules set.</li>
+        {% endfor %}
+    </ul>
 </div>
 {% endblock %}

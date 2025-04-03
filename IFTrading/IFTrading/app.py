@@ -109,6 +109,12 @@ class Transactions(db.Model):
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
     cancel_timestamp = db.Column(db.DateTime, nullable=True)
 
+# Scheduling Model
+class TradingSchedule(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    stop_time = db.Column(db.DateTime, nullable=False)
+    resume_time = db.Column(db.DateTime, nullable=False)
+
 @login_manager.user_loader
 def load_user(user_id):
     return Users.query.get(int(user_id))
@@ -188,7 +194,7 @@ def randomize_stock_prices():
             for stock in stocks:
                 old_price = float(stock.price)
                 direction = random.choice([-1, 1])
-                change_percent = random.uniform(0.08, 0.20)
+                change_percent = random.uniform(0.05, 0.08)
                 new_price = old_price * (1 + direction * change_percent)
                 if new_price < 0.01:
                     new_price = 0.01
@@ -474,9 +480,49 @@ def confirm_trade():
         company=stock.company
     )
 
+#looks for downtime interval to determine if market is open or closed
+def allow_trade():
+    now = datetime.now()
+    active_schedule = TradingSchedule.query.filter(TradingSchedule.stop_time <= now, TradingSchedule.resume_time > now).first()
+    return active_schedule is None
+
+@app.route("/admin/hours", methods=["GET", "POST"])
+@login_required
+@admin_required
+def hours():
+    if request.method == "POST":
+        stop_trading_str = request.form.get("stopTrading")
+        resume_trading_str = request.form.get("resumeTrading")
+        try:
+            # Convert the datetime-local string to a datetime object.
+            stop_trading = datetime.strptime(stop_trading_str, "%Y-%m-%dT%H:%M")
+            resume_trading = datetime.strptime(resume_trading_str, "%Y-%m-%dT%H:%M")
+        except Exception:
+            flash("Invalid datetime format.", "danger")
+            return redirect(url_for("hours"))
+
+        if stop_trading >= resume_trading:
+            flash("Stop time must be before resume time.", "danger")
+            return redirect(url_for("hours"))
+    
+        new_schedule = TradingSchedule(stop_time=stop_trading, resume_time=resume_trading)
+        db.session.add(new_schedule)                       
+        db.session.commit()
+        flash("Trading schedule updated successfully!", "success")
+        return redirect(url_for("hours"))
+    else:
+        # Pass all scheduled intervals to the template so the admin can see them.
+        schedules = TradingSchedule.query.order_by(TradingSchedule.stop_time.desc()).all()
+        return render_template("hours.html", schedules=schedules)
+
+
 @app.route('/execute_trade', methods=["GET", "POST"])
 @login_required
 def execute_trade():
+    if not allow_trade():
+         flash("Trading is currently paused due to scheduled downtime.", "danger")
+         return redirect(url_for("stocks"))
+    
     action = request.form.get("action")
     ticker = request.form.get("ticker")
     try:
@@ -676,8 +722,8 @@ def execute_cash_transaction():
 
 @app.route('/stocks')
 def stocks():
-    stocks_list = Stock.query.all()
-    return render_template('stocks.html', stocks=stocks_list)
+        stocks_list = Stock.query.all()
+        return render_template('stocks.html', stocks=stocks_list)
 
 @app.route('/about')
 def about():
@@ -717,12 +763,6 @@ def add_stock():
         flash("Stock added successfully!")
         return redirect(url_for('add_stock'))
     return render_template("add_stock.html")
-
-@app.route("/admin/hours", methods=["GET", "POST"])
-@login_required
-@admin_required
-def hours():
-    return render_template("hours.html")
 
 @app.route("/admin/admin_stock_list")
 @login_required

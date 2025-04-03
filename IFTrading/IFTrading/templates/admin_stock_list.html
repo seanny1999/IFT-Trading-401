@@ -3,6 +3,36 @@
 {% block title %}Manage Stocks{% endblock %}
 
 {% block content %}
+<!-- Match template Colors/Styles -->
+<style>
+    :root {
+        --bs-primary: #600000;  /* Dark red */
+        --bs-secondary: #FFD700; /* Gold */
+        --bs-dark: #000000;      /* Black */
+    }
+
+    body {
+        background-color: var(--bs-primary) !important;
+        color: #fff !important; /* changed from var(--bs-dark) */
+    }
+
+    .table, .table th, .table td {
+        color: #fff !important; /* changed from var(--bs-dark) */
+    }
+
+    .modal-content {
+        background-color: var(--bs-primary);
+        color: white;
+        border: none;
+    }
+    .modal-header,
+    .modal-body,
+    .modal-footer {
+        background-color: inherit;
+        color: inherit;
+    }
+</style>
+
 <div class="container">
     <h2 class="text-center mt-4">Available Stocks</h2>
 </div>
@@ -17,7 +47,6 @@
                 <th scope="col">Price</th>
                 <th scope="col">Market Cap</th>
                 <th scope="col">Volume</th>
-                <th scope="col">Action</th>
             </tr>
         </thead>
         <tbody>
