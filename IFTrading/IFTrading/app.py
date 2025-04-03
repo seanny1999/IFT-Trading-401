@@ -125,16 +125,12 @@ class Stock(db.Model):
     ticker = db.Column(db.String(100), nullable=False) 
     company = db.Column(db.String(100), nullable=False) 
     price = db.Column(Numeric(10, 2), nullable=False)
-    ##### shares = db.Column(db.String(100), nullable=False) 
-    ##### marketcap = db.Column(db.String(100), nullable=True)
     volume = db.Column(Numeric(10), nullable=False)
 
-    def __init__(self, ticker, company, price, volume): #### Took out (shares, marketcap, )
+    def __init__(self, ticker, company, price, volume):
         self.ticker = ticker
         self.company = company
         self.price = price
-        ##### self.shares = shares
-        ##### self.marketcap = marketcap
         self.volume = volume
 
 @app.before_request
@@ -480,7 +476,7 @@ def confirm_trade():
         company=stock.company
     )
 
-#looks for downtime interval to determine if market is open or closed
+#looks for downtime interval to determine if trading is allowed
 def allow_trade():
     now = datetime.now()
     active_schedule = TradingSchedule.query.filter(TradingSchedule.stop_time <= now, TradingSchedule.resume_time > now).first()
@@ -494,24 +490,26 @@ def hours():
         stop_trading_str = request.form.get("stopTrading")
         resume_trading_str = request.form.get("resumeTrading")
         try:
-            # Convert the datetime-local string to a datetime object.
+            # Converts datetime-local string to an object
             stop_trading = datetime.strptime(stop_trading_str, "%Y-%m-%dT%H:%M")
             resume_trading = datetime.strptime(resume_trading_str, "%Y-%m-%dT%H:%M")
         except Exception:
             flash("Invalid datetime format.", "danger")
             return redirect(url_for("hours"))
 
+        # date-timelocal validation
         if stop_trading >= resume_trading:
             flash("Stop time must be before resume time.", "danger")
             return redirect(url_for("hours"))
-    
+        
+        # Sends schedule to database 
         new_schedule = TradingSchedule(stop_time=stop_trading, resume_time=resume_trading)
         db.session.add(new_schedule)                       
         db.session.commit()
         flash("Trading schedule updated successfully!", "success")
         return redirect(url_for("hours"))
     else:
-        # Pass all scheduled intervals to the template so the admin can see them.
+        # Passes schedule to the template so the admin can see it
         schedules = TradingSchedule.query.order_by(TradingSchedule.stop_time.desc()).all()
         return render_template("hours.html", schedules=schedules)
 
@@ -519,10 +517,12 @@ def hours():
 @app.route('/execute_trade', methods=["GET", "POST"])
 @login_required
 def execute_trade():
+    #displays danger message if the user tries to make a trade after market is closed
     if not allow_trade():
          flash("Trading is currently paused due to scheduled downtime.", "danger")
          return redirect(url_for("stocks"))
     
+    # code to execute when trading resumes
     action = request.form.get("action")
     ticker = request.form.get("ticker")
     try:
@@ -591,13 +591,11 @@ def execute_trade():
             )
             db.session.add(new_portfolio_entry)
 
-        # -- 2) Decrease volume by the shares bought and recalc marketcap
+        # -- 2) Decrease volume by the shares bought
         current_volume -= shares
         if current_volume < 0:
             current_volume = 0
         stock.volume = str(current_volume)  # store as string, as in your model
-        new_marketcap = float(stock.price) * current_volume
-        stock.marketcap = f"{new_marketcap:.2f}"  # store as string, as in your model
 
         db.session.commit()
         flash("Stock purchased successfully!", "success")
@@ -648,11 +646,9 @@ def execute_trade():
                 portfolio_entry.last_updated = datetime.utcnow()
             db.session.commit()
 
-        # -- 2) Increase volume by the shares sold and recalc marketcap
+        # -- 2) Increase volume by the shares sold
         current_volume += shares
         stock.volume = str(current_volume)
-        new_marketcap = float(stock.price) * current_volume
-        stock.marketcap = f"{new_marketcap:.2f}"
 
         db.session.commit()
         flash("Stock sold successfully!", "success")
@@ -753,11 +749,9 @@ def add_stock():
         ticker = request.form['ticker']
         company = request.form['company']
         price = request.form['price']
-        ####### shares = request.form['shares']
-        ####### marketcap = request.form['marketcap']
         volume = request.form['volume']
 
-        new_stock = Stock(ticker, company, price, volume) ##### I took out (shares, marketcap, )
+        new_stock = Stock(ticker, company, price, volume)
         db.session.add(new_stock)
         db.session.commit()
         flash("Stock added successfully!")
