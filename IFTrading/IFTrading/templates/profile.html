@@ -1,9 +1,9 @@
+<!-- Profile page – shows user balance, personal info, and deposit/withdraw modal -->
 {% extends "index.html" %}
 
 {% block title %}Profile{% endblock %}
 
 {% block content %}
-<!-- Load Bootstrap from CDN (optional if you're already including it globally) -->
 <link 
     href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" 
     rel="stylesheet"
@@ -12,7 +12,6 @@
     src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js">
 </script>
 
-<!-- Match template Colors/Styles -->
 <style>
     :root {
         --bs-primary: #600000;  /* Dark red */
@@ -23,12 +22,12 @@
     /* Dark red background, white text for main body */
     body {
         background-color: var(--bs-primary) !important;
-        color: #fff !important; /* changed from var(--bs-dark) */
+        color: #fff !important; 
     }
 
     /* Ensure tables have white text, if needed */
     .table, .table th, .table td {
-        color: #fff !important; /* changed from var(--bs-dark) */
+        color: #fff !important; 
     }
 
     /* Modal styling retains your color scheme */
@@ -49,15 +48,17 @@
     }
 </style>
 
+<!-- Profile main content -->
 <div class="container mt-5">
     <h2 class="text-center">Profile</h2>
 
-    <!-- Total Balance -->
+    <!-- Display total cash balance -->
     <div class="text-center mt-5">
         <h4>Total Cash</h4>
         <h2 class="text-success">${{ balance }} USD</h2>
     </div>
 
+    <!-- Flash messages -->
     <div class="container">
         {% with messages = get_flashed_messages() %}
             {% if messages %}
@@ -103,12 +104,14 @@
                     aria-label="Close">
                 </button>
             </div>
-            <!-- Modal Body -->
+
+            <!-- Modal body with transaction form -->
             <div class="modal-body">
                 <form action="{{ url_for('review_cash_transaction') }}" method="POST">
                     <!-- Hidden input to store "deposit" or "withdraw" -->
                     <input type="hidden" id="transactionAction" name="action">
 
+                    <!-- Amount input -->
                     <div class="mb-3">
                         <label for="amount" class="form-label">Amount</label>
                         <input 
@@ -121,7 +124,7 @@
                             required
                         >
                     </div>
-                    <!-- Submit -->
+                    <!-- Submit button -->
                     <button type="submit" class="btn btn-primary">
                         Review Transaction
                     </button>
@@ -147,7 +150,7 @@
     </div>
 </div>
 
-<!-- Modal JavaScript -->
+<!-- JavaScript to set modal title and action -->
 <script>
 document.addEventListener("DOMContentLoaded", function () {
     var transactionModal = document.getElementById("transactionModal");

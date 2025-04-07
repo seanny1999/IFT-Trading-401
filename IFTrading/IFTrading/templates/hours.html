@@ -1,3 +1,4 @@
+<!-- Admin page – manage and view scheduled trading downtimes -->
 {% extends "index_admin.html" %}
 
 {% block title %}Manage Trade Scheduling{% endblock %}
@@ -14,14 +15,15 @@
         {% endif %}
     {% endwith %}
 
+    <!-- Form to schedule trading pause and resume times -->
     <form action="{{ url_for('hours') }}" method="POST">
         <div class="mb-3">
-            <label for="stopTrading" class="form-label">Stop Trading</label>
+            <label for="stopTrading" class="form-label">Pause Trading</label>
             <input type="datetime-local" class="form-control" id="stopTrading" name="stopTrading" required>
         </div>
 
         <div class="mb-3">
-            <label for="resumeTrading" class="form-label">Resume Trading</label>
+            <label for="resumeTrading" class="form-label">Start Trading</label>
             <input type="datetime-local" class="form-control" id="resumeTrading" name="resumeTrading" required>
         </div>
 
@@ -30,6 +32,7 @@
 
     <hr>
 
+    <!-- List of scheduled downtimes -->
     <h3>Scheduled Downtimes</h3>
     <ul>
         {% for schedule in schedules %}

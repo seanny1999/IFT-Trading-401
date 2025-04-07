@@ -1,3 +1,4 @@
+<!-- Buy Stocks Page - Simple form to buy shares -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -8,16 +9,19 @@
 <body>
     <h1>Buy Stocks</h1>
     
+    <!-- Buy stock form -->
     <form action="{{ url_for('buy') }}" method="POST">
         <label for="ticker">Stock Ticker:</label>
         <input type="text" name="ticker" required>
 
+        <!-- Enter number of shares to purchase -->
         <label for="shares">Number of Shares:</label>
         <input type="number" name="shares" min="1" required>
 
         <button type="submit">Buy</button>
     </form>
 
+    <!-- Link back to portfolio -->
     <a href="{{ url_for('portfolio') }}">Back to Portfolio</a>
 </body>
 </html>

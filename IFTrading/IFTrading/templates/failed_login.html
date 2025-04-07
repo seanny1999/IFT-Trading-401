@@ -1,11 +1,15 @@
+<!-- Login Failed page – shows support info and a link to retry -->
 {% extends "index.html" %}
 
 {% block title %}Login Failed{% endblock %}
 
 {% block content %}
 <div class="container d-flex justify-content-center align-items-center vh-100">
+
+    <!-- Login failed message card -->
     <div class="col-md-4 bg-light p-4 rounded shadow text-center">
         <h2 class="text-danger"><b>Failed to Login</b></h2>
+        <!-- Support contact information -->
         <div class="alert alert-warning mt-3">
             <p class="mb-1">Please retry or contact us at:</p>
             <p class="mb-1">Contact support at (555)-555-5555</p>

@@ -1,3 +1,4 @@
+<!-- Manage Stocks page - allows admin to add stocks and holidays -->
 {% extends "index_admin.html" %}
 
 {% block title %}Manage Stocks{% endblock %}
@@ -6,6 +7,7 @@
 <div class="container">
     <h2>Create A Stock</h2>
 
+    <!-- Display flash messages (e.g., success or error) -->
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
             {% for category, message in messages %}
@@ -14,6 +16,7 @@
         {% endif %}
     {% endwith %}
 
+    <!-- Form to create a new stock -->
     <form action="{{ url_for('add_stock') }}" method="POST">
         <div class="mb-3">
             <label for="ticker" class="form-label">Ticker Symbol</label>
@@ -34,8 +37,27 @@
             <label for="volume" class="form-label">Volume</label>
             <input type="text" class="form-control" id="volume" name="volume" required>
         </div>
+
+        <!-- Form submit and cancel buttons -->
         <button type="submit" class="btn btn-primary">Create</button>
         <a href="{{ url_for('admin') }}" class="btn btn-secondary">Cancel</a>
     </form>
+
+    <!-- Custom holiday creation section -->
+    <hr class="my-4">
+
+    <h4>Add Custom Holiday</h4>
+    <form method="POST" action="{{ url_for('add_holiday') }}">
+        <div class="mb-3">
+            <label for="holiday_name" class="form-label">Holiday Name</label>
+            <input type="text" class="form-control" name="holiday_name" required>
+        </div>
+        <div class="mb-3">
+            <label for="holiday_date" class="form-label">Holiday Date</label>
+            <input type="date" class="form-control" name="holiday_date" required>
+        </div>
+        <button type="submit" class="btn btn-danger">Add Holiday</button>
+    </form>
+    
 </div>
 {% endblock %}

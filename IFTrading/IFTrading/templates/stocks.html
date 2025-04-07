@@ -1,3 +1,4 @@
+<!-- Stock Market page – displays available stocks and allows buy/sell trades -->
 {% extends "index.html" %}
 
 {% block title %}Stock Market{% endblock %}
@@ -17,11 +18,11 @@
 
     body {
         background-color: var(--bs-primary) !important;
-        color: #fff !important; /* changed from var(--bs-dark) */
+        color: #fff !important;
     }
 
     .table, .table th, .table td {
-        color: #fff !important; /* changed from var(--bs-dark) */
+        color: #fff !important;
     }
 
     .modal-content {
@@ -37,9 +38,10 @@
     }
 </style>
 
-<!-- Stock Holdings Table -->
+<!-- Page heading and flash messages -->
 <div class="container">
     <h2 class="text-center mt-4">Available Stocks</h2>
+
     {% with messages = get_flashed_messages(with_categories=true) %}
     {% if messages %}
         {% for category, message in messages %}
@@ -49,6 +51,7 @@
 {% endwith %}
 </div>
 
+<!-- Stock list table -->
 <div class="mt-5">
     <h4 class="text-center"></h4>
     <table class="table table-striped mt-3">
@@ -68,17 +71,18 @@
                 <td>{{ stock.ticker }}</td>
                 <td>{{ stock.company }}</td>
 
-                <!-- 1) Format price to 2 decimals -->
+                <!-- Format price to 2 decimal places -->
                 <td>{{ "%.2f"|format(stock.price) }}</td>
 
-                <!-- 2) Compute Market Cap as price * volume, 
-                        converting volume to int if not empty -->
+                <!-- Format price to 2 decimal places -->
                 <td>
                     {% set vol = stock.volume|int if stock.volume else 0 %}
                     {{ "%.2f"|format(stock.price * vol) }}
                 </td>
 
                 <td>{{ stock.volume }}</td>
+
+                <!-- Buy/Sell buttons trigger trade modal -->
                 <td>
                     <button class="btn btn-success trade-btn"
                         data-bs-toggle="modal" data-bs-target="#tradeModal"
@@ -97,7 +101,7 @@
     </table>
 </div>
 
-<!-- Bootstrap Modal for trading -->
+<!-- Modal for entering trade details -->
 <div class="modal fade" id="tradeModal" tabindex="-1" aria-labelledby="tradeModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -130,7 +134,7 @@
     </div>
 </div>
 
-<!-- Bootstrap JS -->
+<!-- JavaScript to populate trade modal -->
 <script>
 document.addEventListener("DOMContentLoaded", function () {
     var tradeModal = document.getElementById("tradeModal");

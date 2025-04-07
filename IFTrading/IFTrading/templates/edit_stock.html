@@ -1,0 +1,31 @@
+<!-- Edit Stock page – allows admin to update stock details -->
+{% extends "index_admin.html" %}
+{% block title %}Edit Stock{% endblock %}
+
+{% block content %}
+<!-- Main container for edit form -->
+<div class="container mt-4">
+    <h2>Edit Stock</h2>
+<!-- Form to update stock details -->
+    <form method="POST">
+        <div class="mb-3">
+            <label for="ticker" class="form-label">Ticker</label>
+            <input type="text" class="form-control" id="ticker" name="ticker" value="{{ stock.ticker }}" required>
+        </div>
+        <div class="mb-3">
+            <label for="company" class="form-label">Company</label>
+            <input type="text" class="form-control" id="company" name="company" value="{{ stock.company }}" required>
+        </div>
+        <div class="mb-3">
+            <label for="price" class="form-label">Price</label>
+            <input type="number" step="0.01" class="form-control" id="price" name="price" value="{{ stock.price }}" required>
+        </div>
+        <div class="mb-3">
+            <label for="volume" class="form-label">Volume</label>
+            <input type="number" class="form-control" id="volume" name="volume" value="{{ stock.volume }}" required>
+        </div>
+        <button type="submit" class="btn btn-success">Update Stock</button>
+        <a href="{{ url_for('admin_stock_list') }}" class="btn btn-secondary">Cancel</a>
+    </form>
+</div>
+{% endblock %}

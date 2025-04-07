@@ -1,3 +1,4 @@
+<!-- Portfolio page – displays user cash balance and stock holdings -->
 {% extends "index.html" %}
 
 {% block title %}Portfolio{% endblock %}
@@ -37,15 +38,17 @@
     }
 </style>
 
+<!-- Page container -->
 <div class="container">
     <h2 class="text-center mt-4">User Portfolio</h2>
     
-    <!-- Total Balance -->
+    <!-- User's total available cash -->
     <div class="text-center mt-3">
         <h4>Total Cash</h4>
         <h2 class="text-success">${{ balance }} USD</h2>
     </div>
 
+    <!-- Flash messages (e.g., trade confirmation) -->
     <div class="container">
         {% with messages = get_flashed_messages() %}
             {% if messages %}
@@ -58,7 +61,7 @@
         {% endwith %}
     </div>
 
-    <!-- Stock Holdings Table -->
+    <!-- Table displaying current stock holdings -->
     <div class="mt-5">
         <h4 class="text-center">Stock Holdings</h4>
         <table class="table table-striped mt-3">

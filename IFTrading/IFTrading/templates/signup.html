@@ -1,9 +1,12 @@
+<!-- Sign Up page – collects user info and handles registration -->
 {% extends "index.html" %}
 
 {% block title %}Sign Up{% endblock %}
 
 {% block content %}
+<!-- Container to center the signup form -->
 <div class="container d-flex justify-content-center align-items-center my-5">
+
     <div class="col-md-6 bg-light p-4 rounded shadow">
         <h2 class="text-center">Sign Up</h2>
 
@@ -18,6 +21,7 @@
             </div>
         {% endif %}
 
+        <!-- Registration form -->
         <form action="{{ url_for('signup') }}" method="POST">
             <div class="mb-3">
                 <label for="full_name" class="form-label">Full Name:</label>
@@ -71,6 +75,7 @@
             <button type="submit" class="btn btn-primary w-100">Sign Up</button>
         </form>
 
+        <!-- Redirect to login if account already exists -->
         <p class="text-center mt-3">Already have an account? <a href="{{ url_for('login') }}">Log in</a></p>
     </div>
 </div>

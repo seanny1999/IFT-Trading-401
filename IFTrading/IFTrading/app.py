@@ -24,12 +24,12 @@ app.config["SECRET_KEY"] = "YOUR_SECRET_KEY_HERE"
 s = URLSafeTimedSerializer(app.config["SECRET_KEY"])
 
 # Yahoo SMTP Configuration
-app.config["MAIL_SERVER"] = "smtp.gmail.com"  # ✅ Change Yahoo to Gmail
-app.config["MAIL_PORT"] = 587                 # ✅ Same as before
-app.config["MAIL_USE_TLS"] = True             # ✅ Keep TLS enabled
-app.config["MAIL_USE_SSL"] = False            # ✅ Keep SSL disabled
+app.config["MAIL_SERVER"] = "smtp.gmail.com"  # For emailing 2FA
+app.config["MAIL_PORT"] = 587                 # Port fFor emailing 2FAor gmail
+app.config["MAIL_USE_TLS"] = True
+app.config["MAIL_USE_SSL"] = False 
 
-# Hardcoded Yahoo Email Credentials (Needs Security Improvement Later)
+# Gmail Credentials For Emailing 2FA
 app.config["MAIL_USERNAME"] = "ifttrading0@gmail.com"
 app.config["MAIL_PASSWORD"] = "doyl ipwa tvii axiu"
 app.config["MAIL_DEFAULT_SENDER"] = "ifttrading0@gmail.com"
@@ -41,7 +41,7 @@ mail = Mail(app)
 login_manager = LoginManager(app)
 login_manager.login_view = "login"
 migrate = Migrate(app, db)
-price_thread = None  # global or module-level variable to track our thread
+price_thread = None
 
 # Hashing Functions
 def hash_data(data):
@@ -133,10 +133,14 @@ class Stock(db.Model):
         self.price = price
         self.volume = volume
 
+class Holiday(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    date = db.Column(db.Date, nullable=False, unique=True)
+
 @app.before_request
 def start_price_thread():
     global price_thread
-    # Only start the thread if it hasn't been started before
     if price_thread is None or not price_thread.is_alive():
         price_thread = threading.Thread(target=randomize_stock_prices, daemon=True)
         price_thread.start()
@@ -156,12 +160,12 @@ def admin_required(f):
 with app.app_context():
     db.create_all()
     
-    # Ensure 'admin' role exists
+    # Ensures admin role exists
     if not UserRoles.query.filter_by(role_name="admin").first():
         db.session.add(UserRoles(id=1, role_name="admin", permissions="all"))
         db.session.commit()
 
-    # ✅ Ensure 'user' role exists
+    # Ensures user role exists
     if not UserRoles.query.filter_by(role_name="user").first():
         db.session.add(UserRoles(id=2, role_name="user", permissions="basic"))
         db.session.commit()
@@ -183,6 +187,7 @@ def send_otp(email):
     except Exception:
         flash("Failed to send verification email. Please check your email configuration.", "danger")
 
+# For the random stock price generator
 def randomize_stock_prices():
     while True:
         with app.app_context():
@@ -203,6 +208,8 @@ def randomize_stock_prices():
 
         time.sleep(5)
 
+# Start of the routes
+# Route for verifying the one time verification password during 2FA
 @app.route('/verify', methods=["GET", "POST"])
 def verify():
     if "pending_user_id" not in session:
@@ -215,20 +222,17 @@ def verify():
         entered_otp = request.form.get("otp")
 
         if int(entered_otp) == session.get("otp_code"):
-            # Correct OTP → Reset failed attempts
             session.pop("otp_attempts", None)  
             session.pop('_flashes', None)
 
             user = Users.query.get(session["pending_user_id"])
             login_user(user)
 
-            # Remove OTP session values
             session.pop("otp_code", None)
             session.pop("pending_user_id", None)
 
             return redirect(url_for("admin") if user.role_id == UserRoles.query.filter_by(role_name="admin").first().id else url_for("portfolio"))
 
-        # Incorrect OTP → Increase failed attempt count
         session["otp_attempts"] += 1
 
         # After 3 failed OTP attempts, redirect to failed_login page
@@ -240,6 +244,7 @@ def verify():
 
     return render_template('verify.html')
 
+# Route to resend a new one time verification password to the user
 @app.route('/resend_otp')
 def resend_otp():
     if "pending_user_id" in session:
@@ -248,18 +253,20 @@ def resend_otp():
         flash("A new verification code has been sent to your email.", "info")
     return redirect(url_for("verify"))
 
-# Routes
+# Home route that redirects based on if its a user or admin role
 @app.route('/')
 @login_required
 def home():
     return redirect(url_for("admin") if current_user.role_id == UserRoles.query.filter_by(role_name="admin").first().id else url_for("portfolio"))
 
+# Admin dashboard route
 @app.route('/admin')
 @login_required
 @admin_required
 def admin():
     return render_template('admin.html')
 
+# Login route with username/email and password
 @app.route('/login', methods=["GET", "POST"])
 def login():
     if "login_attempts" not in session:
@@ -272,7 +279,7 @@ def login():
         user = Users.query.filter((Users.username == username_email) | (Users.email == username_email)).first()
 
         if user and bcrypt.check_password_hash(user.password, password):
-            # Correct login → Reset failed attempts
+            # Correct login = Resets failed attempts
             session.pop("login_attempts", None)  
             session.pop('_flashes', None)
 
@@ -281,10 +288,10 @@ def login():
             send_otp(user.email)
             return redirect(url_for("verify"))
 
-        # Incorrect login → Increase failed attempt count
+        # Incorrect login = Increase failed attempt count
         session["login_attempts"] += 1
 
-        # After 3 failed attempts, redirect to failed_login page
+        # After 3 failed attempts = redirect to failed_login page
         if session["login_attempts"] >= 3:
             session.pop("login_attempts", None)  # Reset after lockout
             return redirect(url_for("failed_login"))
@@ -293,13 +300,14 @@ def login():
 
     return render_template('login.html')
 
+# Route for user signup and account creation
 @app.route('/signup', methods=["GET", "POST"])
 def signup():
     errors = []
 
     if request.method == "POST":
         full_name = request.form.get("full_name")
-        username = request.form.get("username")  # ✅ FIX: ADD THIS LINE
+        username = request.form.get("username")  # FIX: ADD THIS LINE
         email = request.form.get("email")
         phone, ssn, dob = request.form.get("phone"), request.form.get("ssn"), request.form.get("dob")
         citizenship = request.form.get("citizenship")
@@ -364,17 +372,18 @@ def signup():
 
     return render_template('signup.html', errors=errors)
 
-
+# Route to log out the current user
 @app.route('/logout')
 @login_required
 def logout():
     logout_user()
     return redirect(url_for("login"))
 
+# Route to display the logged in user's profile
 @app.route('/profile')
 @login_required
 def profile():
-    user = current_user  # The logged-in user
+    user = current_user  # The logged in user
     return render_template(
         'profile.html',
         full_name=user.full_name,
@@ -386,6 +395,7 @@ def profile():
         balance=user.balance
     )
 
+# Route to confirm deposits and withdrawals
 @app.route('/confirm_transaction', methods=["GET", "POST"])
 @login_required
 def confirm_transaction():
@@ -416,6 +426,7 @@ def confirm_transaction():
     db.session.commit()
     return redirect(url_for("profile"))
 
+# Route to display the user's stock portfolio
 @app.route('/portfolio')
 @login_required
 def portfolio():
@@ -443,6 +454,7 @@ def portfolio():
     # Pass the user’s cash balance to the template
     return render_template('portfolio.html', holdings=holdings, balance=current_user.balance)
 
+# Route to confirm a trade before execution
 @app.route('/confirm_trade', methods=["GET", "POST"])
 @login_required
 def confirm_trade():
@@ -476,12 +488,41 @@ def confirm_trade():
         company=stock.company
     )
 
-#looks for downtime interval to determine if trading is allowed
+# Checks if trading is allowed based on schedule and holidays
 def allow_trade():
     now = datetime.now()
-    active_schedule = TradingSchedule.query.filter(TradingSchedule.stop_time <= now, TradingSchedule.resume_time > now).first()
+    today = now.date()
+
+    # Hardcoded federal holidays for 2025
+    federal_holidays = [
+        datetime(2025, 1, 1).date(),   # New Year’s Day
+        datetime(2025, 1, 20).date(),  # MLK Day
+        datetime(2025, 2, 17).date(),  # Washington’s Birthday
+        datetime(2025, 4, 18).date(),  # Good Friday
+        datetime(2025, 5, 26).date(),  # Memorial Day
+        datetime(2025, 6, 19).date(),  # Juneteenth
+        datetime(2025, 7, 4).date(),   # Independence Day
+        datetime(2025, 9, 1).date(),   # Labor Day
+        datetime(2025, 11, 27).date(), # Thanksgiving
+        datetime(2025, 12, 25).date(), # Christmas
+    ]
+
+    # Block trading on holidays
+    if today in federal_holidays:
+        return False
+
+    holiday = Holiday.query.filter_by(date=today).first()
+    if holiday:
+        return False
+
+    active_schedule = TradingSchedule.query.filter(
+        TradingSchedule.stop_time <= now,
+        TradingSchedule.resume_time > now
+    ).first()
+
     return active_schedule is None
 
+# Admin page to schedule trading hours (pause/resume)
 @app.route("/admin/hours", methods=["GET", "POST"])
 @login_required
 @admin_required
@@ -513,7 +554,7 @@ def hours():
         schedules = TradingSchedule.query.order_by(TradingSchedule.stop_time.desc()).all()
         return render_template("hours.html", schedules=schedules)
 
-
+# Executes a buy or sell trade if trading is allowed
 @app.route('/execute_trade', methods=["GET", "POST"])
 @login_required
 def execute_trade():
@@ -539,7 +580,7 @@ def execute_trade():
         return redirect(url_for("stocks"))
     price = float(stock.price)
 
-    # -- 1) Convert stock.volume from string to int
+    # 1) Convert stock.volume from string to int
     # If volume is missing or invalid, default to 0
     try:
         current_volume = int(stock.volume)
@@ -551,6 +592,9 @@ def execute_trade():
         user_balance = current_user.balance or 0.0
         if user_balance < total_cost:
             flash("Insufficient funds!", "danger")
+            return redirect(url_for("stocks"))
+        if shares > current_volume:
+            flash(f"Only {current_volume} shares are available for {ticker}.", "danger")
             return redirect(url_for("stocks"))
         current_user.balance = user_balance - total_cost
 
@@ -591,7 +635,7 @@ def execute_trade():
             )
             db.session.add(new_portfolio_entry)
 
-        # -- 2) Decrease volume by the shares bought
+        # 2) Decrease volume by the shares bought
         current_volume -= shares
         if current_volume < 0:
             current_volume = 0
@@ -646,7 +690,7 @@ def execute_trade():
                 portfolio_entry.last_updated = datetime.utcnow()
             db.session.commit()
 
-        # -- 2) Increase volume by the shares sold
+        # Increase volume by the shares sold
         current_volume += shares
         stock.volume = str(current_volume)
 
@@ -658,7 +702,7 @@ def execute_trade():
     
     return redirect(url_for("portfolio"))
 
-
+# Review and confirm a deposit or withdrawal
 @app.route('/review_cash_transaction', methods=["POST"])
 @login_required
 def review_cash_transaction():
@@ -683,6 +727,7 @@ def review_cash_transaction():
         amount=amount
     )
 
+# Finalize deposit or withdrawal after confirmation
 @app.route('/execute_cash_transaction', methods=["POST"])
 @login_required
 def execute_cash_transaction():
@@ -716,15 +761,18 @@ def execute_cash_transaction():
     db.session.commit()
     return redirect(url_for("profile"))
 
+# Show all available stocks to the user
 @app.route('/stocks')
 def stocks():
         stocks_list = Stock.query.all()
         return render_template('stocks.html', stocks=stocks_list)
 
+# Display the About page
 @app.route('/about')
 def about():
     return render_template('about.html')
 
+# Show user's transaction history
 @app.route('/history')
 @login_required
 def history():
@@ -741,6 +789,7 @@ def history():
         transactions=user_transactions
     )
 
+# Admin route to add a new stock to the system
 @app.route("/admin/add_stock", methods=["GET", "POST"])
 @login_required
 @admin_required
@@ -758,6 +807,7 @@ def add_stock():
         return redirect(url_for('add_stock'))
     return render_template("add_stock.html")
 
+# Admin route to list all stocks
 @app.route("/admin/admin_stock_list")
 @login_required
 @admin_required
@@ -765,10 +815,42 @@ def admin_stock_list():
     stocks_list = Stock.query.all()
     return render_template('admin_stock_list.html', stocks=stocks_list)
 
+# Admin route to edit an existing stock
+@app.route("/admin/edit_stock/<int:stock_id>", methods=["GET", "POST"])
+@login_required
+@admin_required
+def edit_stock(stock_id):
+    stock = Stock.query.get_or_404(stock_id)
+
+    if request.method == "POST":
+        stock.ticker = request.form['ticker']
+        stock.company = request.form['company']
+        stock.price = request.form['price']
+        stock.volume = request.form['volume']
+        
+        db.session.commit()
+        flash("Stock updated successfully!", "success")
+        return redirect(url_for("admin_stock_list"))
+
+    return render_template("edit_stock.html", stock=stock)
+
+# Admin route to delete a stock
+@app.route("/admin/delete_stock/<int:stock_id>", methods=["POST"])
+@login_required
+@admin_required
+def delete_stock(stock_id):
+    stock = Stock.query.get_or_404(stock_id)
+    db.session.delete(stock)
+    db.session.commit()
+    flash("Stock deleted successfully!", "success")
+    return redirect(url_for("admin_stock_list"))
+
+# Shown after 3 failed login attempts
 @app.route('/failed_login')
 def failed_login():
     return render_template('failed_login.html')
 
+# Handle password reset request via email
 @app.route('/forgot_password', methods=["GET", "POST"])
 def forgot_password():
     if request.method == "POST":
@@ -793,6 +875,7 @@ def forgot_password():
 
     return render_template("forgotpassword.html")
 
+# Reset password from the IFTtrading email
 @app.route('/reset_password/<token>', methods=["GET", "POST"])
 def reset_password(token):
     try:
@@ -811,18 +894,18 @@ def reset_password(token):
         password = request.form.get("password")
         confirm_password = request.form.get("confirm_password")
 
-        # 1️⃣ Check if passwords match
+        # Check if passwords match
         if password != confirm_password:
             flash("Passwords do not match!", "danger")
             return render_template("resetpassword.html", token=token)
 
-        # 2️⃣ Validate password complexity (14+ chars, 2 uppercase, 2 lowercase, 2 numbers, 2 special characters)
+        # Validate password complexity (14+ chars, 2 uppercase, 2 lowercase, 2 numbers, 2 special characters)
         password_regex = r"^(?=.*[A-Z].*[A-Z])(?=.*[a-z].*[a-z])(?=.*\d.*\d)(?=.*[@$!%*?&].*[@$!%*?&]).{14,}$"
         if not re.match(password_regex, password):
             flash("Password must meet security requirements.", "danger")
             return render_template("resetpassword.html", token=token)
 
-        # 3️⃣ Hash and update password in DB
+        # Hash and update password in DB
         user.password = bcrypt.generate_password_hash(password).decode('utf-8')
         db.session.commit()
 
@@ -831,7 +914,34 @@ def reset_password(token):
 
     return render_template("resetpassword.html", token=token)
 
+# Admin adds a new trading holiday
+@app.route('/admin/add_holiday', methods=["POST"])
+@login_required
+@admin_required
+def add_holiday():
+    name = request.form.get("holiday_name")
+    date_str = request.form.get("holiday_date")
+
+    try:
+        date_obj = datetime.strptime(date_str, "%Y-%m-%d").date()
+    except ValueError:
+        flash("Invalid date format.", "danger")
+        return redirect(url_for("add_stock"))
+
+    # Prevent duplicates
+    if Holiday.query.filter_by(date=date_obj).first():
+        flash("Holiday already exists on that date.", "warning")
+        return redirect(url_for("add_stock"))
+
+    new_holiday = Holiday(name=name, date=date_obj)
+    db.session.add(new_holiday)
+    db.session.commit()
+    flash("Holiday added successfully!", "success")
+    return redirect(url_for("add_stock"))
+
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
     app.run(debug=True)
+
+    execute_trade()
