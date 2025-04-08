@@ -1,0 +1,15 @@
+flask
+
+flask_sqlalchemy
+
+flask_login
+
+flask_bcrypt
+
+flask_mail
+
+flask_migrate
+
+sqlachemy
+
+pymysql
