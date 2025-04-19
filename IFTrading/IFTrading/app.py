@@ -17,7 +17,8 @@ import time
 app = Flask(__name__)
 
 # Configuration for database and security
-app.config["SQLALCHEMY_DATABASE_URI"] = "mysql+pymysql://root:password@localhost/IFT_Trading"
+# app.config["SQLALCHEMY_DATABASE_URI"] = "mysql+pymysql://root:password@localhost/IFT_Trading"
+app.config["SQLALCHEMY_DATABASE_URI"] = "mysql+pymysql://admin:193IFT285@my-rds-instance.cjgeco4qapt5.us-west-1.rds.amazonaws.com:3306/sample_db"
 app.config["SECRET_KEY"] = "YOUR_SECRET_KEY_HERE"
 
 # Create a serializer for secure token generation
