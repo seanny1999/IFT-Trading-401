@@ -17,8 +17,7 @@ import time
 app = Flask(__name__)
 
 # Configuration for database and security
-# app.config["SQLALCHEMY_DATABASE_URI"] = "mysql+pymysql://root:password@localhost/IFT_Trading"
-app.config["SQLALCHEMY_DATABASE_URI"] = "mysql+pymysql://admin:193IFT285@my-rds-instance.cjgeco4qapt5.us-west-1.rds.amazonaws.com:3306/sample_db"
+app.config["SQLALCHEMY_DATABASE_URI"] = "mysql+pymysql://root:password@localhost/IFT_Trading"
 app.config["SECRET_KEY"] = "YOUR_SECRET_KEY_HERE"
 
 # Create a serializer for secure token generation
@@ -427,11 +426,12 @@ def confirm_transaction():
     db.session.commit()
     return redirect(url_for("profile"))
 
-# Route to display the user's stock portfolio
 @app.route('/portfolio')
 @login_required
 def portfolio():
     holdings = []
+    total_stock_value = 0  # Initialize total stock value
+
     tickers = db.session.query(Transactions.ticker).filter_by(user_id=current_user.id).distinct()
     for ticker_obj in tickers:
         ticker = ticker_obj[0]
@@ -444,16 +444,17 @@ def portfolio():
         net_shares = total_buys - total_sells
         if net_shares > 0:
             stock = Stock.query.filter_by(ticker=ticker).first()
+            value = float(net_shares) * float(stock.price)
             holdings.append({
                 'ticker': ticker,
                 'company': stock.company,
                 'quantity': net_shares,
                 'price': float(stock.price),
-                'value': float(net_shares) * float(stock.price)
+                'value': value
             })
+            total_stock_value += value  # Add to total
 
-    # Pass the user’s cash balance to the template
-    return render_template('portfolio.html', holdings=holdings, balance=current_user.balance)
+    return render_template('portfolio.html', holdings=holdings, balance=current_user.balance, total_stock_value=total_stock_value)
 
 # Route to confirm a trade before execution
 @app.route('/confirm_trade', methods=["GET", "POST"])
@@ -764,9 +765,26 @@ def execute_cash_transaction():
 
 # Show all available stocks to the user
 @app.route('/stocks')
+@login_required
 def stocks():
-        stocks_list = Stock.query.all()
-        return render_template('stocks.html', stocks=stocks_list)
+    stocks_list = Stock.query.all()
+
+    # Calculate net shares per ticker
+    owned_tickers = []
+    tickers = db.session.query(Transactions.ticker).filter_by(user_id=current_user.id).distinct()
+    for ticker_obj in tickers:
+        ticker = ticker_obj[0]
+        total_buys = db.session.query(db.func.sum(Transactions.quantity))\
+            .filter_by(ticker=ticker, transaction_type='Buy', user_id=current_user.id)\
+            .scalar() or 0
+        total_sells = db.session.query(db.func.sum(Transactions.quantity))\
+            .filter_by(ticker=ticker, transaction_type='Sell', user_id=current_user.id)\
+            .scalar() or 0
+        net_shares = total_buys - total_sells
+        if net_shares > 0:
+            owned_tickers.append(ticker)
+
+    return render_template('stocks.html', stocks=stocks_list, owned_tickers=owned_tickers)
 
 # Display the About page
 @app.route('/about')

@@ -89,11 +89,16 @@
                         data-action="buy" data-ticker="{{ stock.ticker }}">
                         Buy
                     </button>
-                    <button class="btn btn-danger trade-btn"
-                        data-bs-toggle="modal" data-bs-target="#tradeModal"
-                        data-action="sell" data-ticker="{{ stock.ticker }}">
-                        Sell
-                    </button>
+                    {% if stock.ticker in owned_tickers %}
+                        <button class="btn btn-danger trade-btn"
+                            data-bs-toggle="modal" data-bs-target="#tradeModal"
+                            data-action="sell" data-ticker="{{ stock.ticker }}">
+                            Sell
+                        </button>
+                    {% else %}
+                        <button class="btn btn-danger" disabled>Sell</button>
+                    {% endif %}
+
                 </td>
             </tr>
             {% endfor %}
