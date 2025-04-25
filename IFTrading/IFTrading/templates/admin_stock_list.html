@@ -1,4 +1,3 @@
-<!-- Admin stock list page – view, edit, and delete stocks -->
 {% extends "index_admin.html" %}
 
 {% block title %}Manage Stocks{% endblock %}
@@ -37,6 +36,15 @@
 <div class="container">
     <h2 class="text-center mt-4">Available Stocks</h2>
 </div>
+
+<!-- Flash messages -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, message in messages %}
+            <div class="alert alert-{{ category }} mt-3">{{ message }}</div>
+        {% endfor %}
+    {% endif %}
+{% endwith %}
 
 <!-- Stock table section -->
 <div class="mt-5">

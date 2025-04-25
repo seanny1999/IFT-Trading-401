@@ -18,7 +18,7 @@ app = Flask(__name__)
 
 # Configuration for database and security
 # app.config["SQLALCHEMY_DATABASE_URI"] = "mysql+pymysql://root:password@localhost/IFT_Trading"
-app.config["SQLALCHEMY_DATABASE_URI"] = "mysql+pymysql://admin:193IFT285@my-rds-instance.cjgeco4qapt5.us-west-1.rds.amazonaws.com:3306/sample_db"
+app.config["SQLALCHEMY_DATABASE_URI"] = "mysql+pymysql://admin:193IFT285@my-rds-instance.cjgeco4qapt5.us-west-1.rds.amazonaws.com:3306/IFT_Trading"
 app.config["SECRET_KEY"] = "YOUR_SECRET_KEY_HERE"
 
 # Create a serializer for secure token generation
@@ -188,26 +188,33 @@ def send_otp(email):
     except Exception:
         flash("Failed to send verification email. Please check your email configuration.", "danger")
 
-# For the random stock price generator
 def randomize_stock_prices():
     while True:
         with app.app_context():
             stocks = Stock.query.all()
             for stock in stocks:
                 old_price = float(stock.price)
-                direction = random.choice([-1, 1])
-                change_percent = random.uniform(0.05, 0.08)
+                min_price = 5.0
+                max_price = 500.0
+
+                # Dynamic direction control
+                if old_price < min_price * 1.2:
+                    direction = 1
+                elif old_price > max_price * 0.8:
+                    direction = -1
+                else:
+                    direction = random.choice([-1, 1])
+
+                change_percent = random.uniform(0.01, 0.03)
                 new_price = old_price * (1 + direction * change_percent)
-                if new_price < 0.01:
-                    new_price = 0.01
 
-                stock.price = new_price
+                # Clamp price
+                stock.price = max(min_price, min(new_price, max_price))
 
-                print(f"Updated {stock.ticker} from {old_price} to {new_price}")
+                print(f"Updated {stock.ticker} from {old_price:.2f} to {stock.price:.2f}")
 
             db.session.commit()
-
-        time.sleep(5)
+        time.sleep(5)  # every 5 seconds
 
 # Start of the routes
 # Route for verifying the one time verification password during 2FA
