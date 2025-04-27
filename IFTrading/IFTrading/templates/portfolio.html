@@ -48,6 +48,13 @@
         <h2 class="text-success">${{ balance }} USD</h2>
     </div>
 
+    <!-- Total Stock Value -->
+    <div class="text-center mt-3">
+        <h4>Total Stock Value</h4>
+        <h2 class="text-info">${{ '%.2f'|format(total_stock_value) }} USD</h2>
+    </div>
+
+
     <!-- Flash messages (e.g., trade confirmation) -->
     <div class="container">
         {% with messages = get_flashed_messages() %}
